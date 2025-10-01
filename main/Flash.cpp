@@ -4,7 +4,7 @@
 
 Preferences prefs;
 
-// Configuración de SPIFFS
+// Configuracion de SPIFFS
 #define FORMAT_SPIFFS_IF_FAILED true
 
 // Variables globales 
@@ -18,7 +18,7 @@ unsigned long publishInterval = 60;
 /*MEMORIA CIRCULAR*/
 static int writeIndex = 0;
 static int readIndex = 0;
-static char currentPacket[MAX_PACKET_SIZE];  // paquete leído temporalmente
+static char currentPacket[MAX_PACKET_SIZE];  // paquete leido temporalmente
 static bool packetLoaded = false;
 
 
@@ -33,11 +33,11 @@ void lectura_flash() {
 
   ident = leer_de_flash("ident");
 
-  Serial.print("Última Latitud guardada: ");
+  Serial.print("ultima Latitud guardada: ");
   Serial.println(ultimaLat);
-  Serial.print("Última Longitud guardada: ");
+  Serial.print("ultima Longitud guardada: ");
   Serial.println(ultimaLon);
-  Serial.print("Última Último publish_time guardado: ");
+  Serial.print("ultima ultimo publish_time guardado: ");
   Serial.println(spublishInterval);Serial.print(publishInterval);
 }
 
@@ -92,7 +92,7 @@ bool flash_buffer_full() {
 
 
 
-// Retorna true si el buffer está vacío
+// Retorna true si el buffer esta vacio
 bool flash_buffer_empty() {
   return writeIndex == readIndex;
 }
@@ -103,9 +103,9 @@ bool flash_buffer_empty() {
 
 bool flash_save_packet(const char* json) {
   if (flash_buffer_full()) {
-    // Si está lleno, adelantá readIndex para "pisar" el paquete más viejo
+    // Si esta lleno, adelanta readIndex para "pisar" el paquete mas viejo
     readIndex = (readIndex + 1) % MAX_PACKETS;
-    Serial.println("⚠️ Buffer lleno, se sobrescribirá el paquete más viejo");
+    Serial.println(" Buffer lleno, se sobrescribira el paquete mas viejo");
   }
 
   // Guardar json en SPIFFS en archivo packet_writeIndex.json
@@ -122,10 +122,10 @@ bool flash_save_packet(const char* json) {
 
   writeIndex = (writeIndex + 1) % MAX_PACKETS;
 
-  // Guardar índices en Preferences
+  // Guardar indices en Preferences
   if(prefs.begin("flash_buf", false)) {
     prefs.putInt("widx", writeIndex);
-    prefs.putInt("ridx", readIndex);  // actualizá también el readIndex si se pisó
+    prefs.putInt("ridx", readIndex);  // actualiza tambien el readIndex si se piso
     prefs.end();
   }
 
@@ -178,11 +178,11 @@ void flash_mark_packet_sent() {
   readIndex = (readIndex + 1) % MAX_PACKETS;
   packetLoaded = false;
 
-  // Guardar índice en Preferences
+  // Guardar indice en Preferences
   if(prefs.begin("flash_buf", false)) {
     prefs.putInt("ridx", readIndex);
     prefs.end();
   }
 
-  Serial.printf("Paquete índice %d marcado como enviado\n", (readIndex == 0) ? MAX_PACKETS - 1 : readIndex - 1);
+  Serial.printf("Paquete indice %d marcado como enviado\n", (readIndex == 0) ? MAX_PACKETS - 1 : readIndex - 1);
 }

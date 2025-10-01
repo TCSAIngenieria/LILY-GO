@@ -90,16 +90,16 @@ void printModemInfo(TinyGsm &modem, String &res) {
 
 bool updateClockFromNTP(TinyGsm &modem) {
   String res;
-  Serial.println("[NTP] Solicitando sincronización...");
+  Serial.println("[NTP] Solicitando sincronizacion...");
   modem.sendAT("AT+CNTP=\"pool.ntp.org\",0");
   if (modem.waitResponse(1000L, res) == 1) {
     Serial.println(res);
   }
   res = "";
     
-  delay(2000); // Espera para que la hora se actualice en el módem
+  delay(2000); // Espera para que la hora se actualice en el modem
 
-  Serial.println("[NTP] Leyendo hora desde el módem...");
+  Serial.println("[NTP] Leyendo hora desde el modem...");
   modem.sendAT("+CCLK?");
   
   if (modem.waitResponse(1000L, res) == 1) {
@@ -120,11 +120,11 @@ bool updateClockFromNTP(TinyGsm &modem) {
     }
   }else{
 
-  Serial.println("[NTP] No se pudo parsear la hora del módem");
+  Serial.println("[NTP] No se pudo parsear la hora del modem");
   return false;
 }
 }
-String currentTime = "00/00/00,00:00:00+00";  // formato del módem
+String currentTime = "00/00/00,00:00:00+00";  // formato del modem
 
 void updateInternalClock(String clockString) {
   struct tm tm;
@@ -181,7 +181,7 @@ void updateNetworkConnection(TinyGsm &modem) {
   delay(1000);
   isModemConnected = modem.isNetworkConnected();
 
-  Serial.print("Modo conexión: ");
+  Serial.print("Modo conexion: ");
   Serial.print(networkModes[currentModeIndex]);
   Serial.print(" - Conectado? ");
   Serial.println(isModemConnected ? "SI" : "NO");

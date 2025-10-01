@@ -39,8 +39,8 @@ void leerSensorSerial(Stream &serial) {
 
     
   // Si estamos recibiendo y:
-  // - hay un marcador de fin definido y se detectó
-  // - o NO hay marcador de fin y pasó el timeout
+  // - hay un marcador de fin definido y se detecto
+  // - o NO hay marcador de fin y paso el timeout
   bool hayEndMarker = getEndMarker().length() > 0;
   bool finPorEndMarker = receiving && hayEndMarker && buffer.endsWith(getEndMarker());
   bool finPorTimeout = receiving && !hayEndMarker && (millis() - lastCharTime > timeout);
@@ -66,7 +66,7 @@ void leerSensorSerial(Stream &serial) {
       lastIndex = idx + 1;
     }
 
-    // Agrego el último campo (si hay lugar)
+    // Agrego el ultimo campo (si hay lugar)
     if (count < 16) {
       sensorValues[count++] = buffer.substring(lastIndex);
     }
@@ -80,7 +80,7 @@ void leerSensorSerial(Stream &serial) {
       Serial.println(sensorValues[i]);
     }
 
-    // Limpio para la próxima trama
+    // Limpio para la proxima trama
     Serial.print("<< Respuesta de expansora: ");
     Serial.println(buffer);
     buffer = "";
@@ -99,7 +99,7 @@ void leerSensorSerial(Stream &serial) {
 
 
 void imprimirSensorValuesValidos() {
-  Serial.println("Últimos sensores válidos recibidos:");
+  Serial.println("ultimos sensores validos recibidos:");
   for (int i = 0; i < 16; i++) {
     if (sensorValues[i].length() > 0 && sensorValues[i] != "nan") {
       Serial.print("S ");

@@ -15,29 +15,29 @@ void DS18B20::initSensor() {
   
   sensors.begin();
   if (!sensors.getAddress(address, 0)) {
-    Serial.println("❌ No se encontró el sensor DS18B20.");
+    Serial.println(" No se encontro el sensor DS18B20.");
     sensorEncontrado = false;
   } else {
-    Serial.println("✅ Sensor DS18B20 encontrado.");
+    Serial.println(" Sensor DS18B20 encontrado.");
     sensorEncontrado = true;
   }
 }
 
 float DS18B20::readValue() {
   if (!sensorEncontrado) {
-    Serial.println("❌ Sensor no detectado. Reiniciando...");
+    Serial.println(" Sensor no detectado. Reiniciando...");
     return -999.0;
   }
 
   sensors.requestTemperatures();
   float temp = sensors.getTempCByIndex(0);
 
-  // Controla que la lectura no sea error por desconexión o valores inválidos típicos
+  // Controla que la lectura no sea error por desconexion o valores invalidos tipicos
   if (temp == DEVICE_DISCONNECTED_C || temp == -127.0 || temp < -55.0 || temp > 85.0) {
-    Serial.println("⚠️ Error leyendo la temperatura. Devolviendo última válida.");
+    Serial.println(" Error leyendo la temperatura. Devolviendo ultima valida.");
     return ultimaTempValida;
   } else {
-    // Actualiza última válida solo si cambió más de 0.01 grados
+    // Actualiza ultima valida solo si cambio mas de 0.01 grados
     if (abs(temp - ultimaTempValida) > 0.01) {
       ultimaTempValida = temp;
       tiempoUltimoCambio = millis();
@@ -74,7 +74,7 @@ void DS18B20::loop() {
 
     case ENCENDIDO:
   if (now - tiempoReinicio > 500) {
-    Serial.println("✅ Sonda DS18B20 reiniciada.");
+    Serial.println(" Sonda DS18B20 reiniciada.");
     tiempoUltimoCambio = now;
     initSensor();  
     estadoReinicio = IDLE;

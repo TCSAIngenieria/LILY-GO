@@ -64,7 +64,7 @@ String getLongitude() {
     return longitude;
 }
 
-//Función para saber si es válida la posición GNSS
+//Funcion para saber si es valida la posicion GNSS
 bool isLocationValid() {
     return locationValid;
 }

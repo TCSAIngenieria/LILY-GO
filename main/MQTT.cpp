@@ -31,12 +31,12 @@ boolean mqttConnect() {
   Serial.println(MQTT_BROKER);
 
   if (mqtt.connect(ident.c_str())) {
-    Serial.println("✅ Conectado a MQTT!");
+    Serial.println(" Conectado a MQTT!");
     mqttActivo = true;
     mqttUltimaConexionOK = millis();
 
-    String topicFOTA = "DVL/NODEMCU/" + ident + "/FOTA";
-    String topicCMD = "DVL/NODEMCU/" + ident + "/COMANDOS";
+    String topicFOTA = "DVL/LILY-GO/" + ident + "/FOTA";
+    String topicCMD = "DVL/LILY-GO/" + ident + "/COMANDOS";
 
     mqtt.subscribe(topicFOTA.c_str());
     mqtt.subscribe(topicCMD.c_str());
@@ -45,7 +45,7 @@ boolean mqttConnect() {
     esp_task_wdt_reset();
     return true;
   } else {
-    Serial.print("❌ Error al conectar a MQTT. Código: ");
+    Serial.print(" Error al conectar a MQTT. Codigo: ");
     Serial.println(mqtt.state());
     esp_task_wdt_reset();
     return false;
@@ -75,7 +75,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int len) {
     preferences.end();
     
     if (storedURL != message) {
-      Serial.println("🔄 Nueva URL FOTA detectada. Iniciando actualización...");
+      Serial.println(" Nueva URL FOTA detectada. Iniciando actualizacion...");
       FOTA.startUpdate(message);
     } else {
       Serial.println("URL FOTA igual a la actual. Ignorando.");
@@ -84,13 +84,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int len) {
 
   // COMANDOS
   else if (topicStr.endsWith("/COMANDOS")) {
-    Serial.println("🟡 Comando MQTT recibido: " + message);
+    Serial.println(" Comando MQTT recibido: " + message);
 
     // Construir topic de respuesta
-    String topicRespuesta = "DVL/NODEMCU/" + ident + "/RESPUESTA";
+    String topicRespuesta = "DVL/LILY-GO/" + ident + "/RESPUESTA";
 
     String respuesta = procesarComando(message);
-    // Publicar la respuesta en el tópico
+    // Publicar la respuesta en el topico
     if (mqtt.connected()) {
         mqtt.publish(topicRespuesta.c_str(), respuesta.c_str());
 
@@ -98,7 +98,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int len) {
   }
 
   else {
-    Serial.println("🔘 Tópico MQTT no manejado: " + topicStr);
+    Serial.println(" Topico MQTT no manejado: " + topicStr);
   }
 }
 
@@ -114,7 +114,7 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
     Serial.print("Publicado JSON en topic ");
     Serial.print(topic);
     Serial.print(": ");
-    Serial.println(sent ? "OK" : "FALLÓ");
+    Serial.println(sent ? "OK" : "FALLo");
     Serial.println(jsonPayload);  // Para debug: imprime el JSON publicado
 
     return sent;
@@ -128,9 +128,9 @@ String create_mqtt_json_sensor(String topic, String ident, String valor_variable
     doc["date"] = fechayhora;
     doc["latitud"] = latitud;
     doc["longitud"] = longitud;
-    doc["Tensión_batería"] = Vbateria;
-    doc["Tensión_principal"] = Vprincipal;
-    doc["Versión"] = versionado;
+    doc["Tension_bateria"] = Vbateria;
+    doc["Tension_principal"] = Vprincipal;
+    doc["Version"] = versionado;
     doc["index"] = numeroPaquete;
 
     char payload[256];
@@ -161,9 +161,9 @@ String S6, String S7, String S8, String S9, String S10, String S11, String S12, 
     doc["date"] = fechayhora;
     doc["latitud"] = latitud;
     doc["longitud"] = longitud;
-    doc["Tensión_batería"] = Vbateria;
-    doc["Tensión_principal"] = Vprincipal;
-    doc["Versión"] = versionado;
+    doc["Tension_bateria"] = Vbateria;
+    doc["Tension_principal"] = Vprincipal;
+    doc["Version"] = versionado;
     doc["index"] = numeroPaquete;
 
     char payload[512];

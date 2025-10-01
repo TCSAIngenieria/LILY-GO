@@ -16,7 +16,7 @@ void updateClockFromNTP_wifi() {
 
   struct tm timeinfo;
   int intentos = 0;
-  const int maxIntentos = 30;  // 30 * 200ms = 6 segundos máx
+  const int maxIntentos = 30;  // 30 * 200ms = 6 segundos max
 
   while (!getLocalTime(&timeinfo) && intentos < maxIntentos) {
     delay(10);                 // esperar un poco entre intentos
@@ -25,7 +25,7 @@ void updateClockFromNTP_wifi() {
   }
 
   if (intentos >= maxIntentos) {
-    Serial.println("[NTP] ⚠️ Falló la sincronización tras varios intentos");
+    Serial.println("[NTP]  Fallo la sincronizacion tras varios intentos");
     return;
   }
 
@@ -33,9 +33,9 @@ void updateClockFromNTP_wifi() {
   struct timeval tv = { .tv_sec = now };
   settimeofday(&tv, NULL);
 
-  Serial.println("[NTP] ✅ Sincronización exitosa");
+  Serial.println("[NTP]  Sincronizacion exitosa");
   Serial.println(ctime(&now));
-  esp_task_wdt_reset();  // por las dudas, una más
+  esp_task_wdt_reset();  // por las dudas, una mas
 }
 
 

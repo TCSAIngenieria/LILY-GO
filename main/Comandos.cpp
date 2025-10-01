@@ -3,6 +3,7 @@
 #include "GNSS.h" // Para setLatitude, setLongitude, setLocationValid
 #include <Preferences.h>
 #include "FOTA.h"
+#include "DS18B20.h"
 
 
 extern Preferences preferences;
@@ -67,7 +68,7 @@ String procesarComando(String comando) {
     respuesta = "[OK] Separador: " + String(separator);
 
 
-  /* COMANDOS TIEMPO PUBLICACIÓN DATOS */
+  /* COMANDOS TIEMPO PUBLICACIoN DATOS */
   } else if (comando.startsWith("DVL+STIME=")) {
     String publishInterval_s = comando.substring(10);
     guardar_en_flash("time", publishInterval_s);
@@ -80,7 +81,7 @@ String procesarComando(String comando) {
     guardar_en_flash("ident", ident_s);
     ident = ident_s;
 
-    topic1 = "DVL/NODEMCU/" + ident;
+    topic1 = "DVL/LILY-GO/" + ident;
     respuesta = "Rident_OK (TOPIC: " + topic1 + ")";
 
   } else if (comando.startsWith("DVL+FOTA=")) {
@@ -155,7 +156,7 @@ String procesarComando(String comando) {
     respuesta = "EN_SERIAL=" + String(en_serial);
     
     } else if (comando.startsWith("EXP+")) {
-  // Reenvía el comando al puerto serial secundario
+  // Reenvia el comando al puerto serial secundario
   SensorSerial.println(comando);
 
   // Esperar y leer respuesta de la expansora
@@ -172,12 +173,12 @@ String procesarComando(String comando) {
   if (respuestaExp.length() > 0) {
     respuesta = "RESP_EXPANSORA: " + respuestaExp;
   } else {
-    respuesta = "[WARN] No se recibió respuesta de la expansora.";
+    respuesta = "[WARN] No se recibio respuesta de la expansora.";
   }} else {
     respuesta = "[ERR] Comando no reconocido.";
   }
 
-  // Siempre lo mostramos también por Serial
+  // Siempre lo mostramos tambien por Serial
   Serial.println(respuesta);
   return respuesta;
 }
@@ -194,7 +195,7 @@ void guardarConfiguracionParser() {
 
 void cargarConfiguracionParser() {
   preferences.begin("parser", true);
-  startMarker = preferences.getString("start", "DATA,"); //esto carga los datos escritos en memoria. El primer parámetro es la 'clave' con el que se guarda esa variable en flash, y el segundo, se usa como valor si no hay nada guardado en la flash
+  startMarker = preferences.getString("start", "DATA,"); //esto carga los datos escritos en memoria. El primer parametro es la 'clave' con el que se guarda esa variable en flash, y el segundo, se usa como valor si no hay nada guardado en la flash
   endMarker = preferences.getString("end", "\r");
   separator = preferences.getUChar("sep", ',');
   preferences.end();

@@ -5,7 +5,7 @@
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 
-// Configuración del broker
+// Configuracion del broker
 
 #define MQTT_USER     "DVL_test1"
 #define MQTT_PASSWORD "DVL_test1"

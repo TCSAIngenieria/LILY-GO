@@ -22,7 +22,7 @@ extern SensorInterface* sensor;
 
 
 
-// Función para generar barras Unicode según RSSI
+// Funcion para generar barras Unicode segun RSSI
 String signalBars(int rssi) {
   String bars;
   if (rssi > -50)
@@ -273,7 +273,7 @@ void handleRootPrivado() {
   </script>
 </head>
 <body>
-  <h1>Configuración MQTT</h1>
+  <h1>Configuracion MQTT</h1>
   <form action="/save" method="POST">
     IP Broker: <input type="text" name="ip" value=")rawliteral" + ip + R"rawliteral("><br>
     Puerto: <input type="number" name="port" value=")rawliteral" + String(port) + R"rawliteral("><br>
@@ -303,7 +303,7 @@ void handleSavePrivado() {
     preferences.end();
 
     adminServer.send(200, "text/html", "<h1>Guardado! <a href='/'>Volver</a></h1>");
-    Serial.println("NUEVOS PARÁMETROS MQTT");
+    Serial.println("NUEVOS PARaMETROS MQTT");
     ESP.restart();
   } else {
     adminServer.send(400, "text/plain", "Faltan datos");
@@ -318,7 +318,7 @@ void handleValorSensor() {
 void iniciarWebServerPrivado() {
   adminServer.on("/", handleRootPrivado);
   adminServer.on("/save", HTTP_POST, handleSavePrivado);
-  adminServer.on("/valor", HTTP_GET, handleValorSensor);  // 👈 esta línea
+  adminServer.on("/valor", HTTP_GET, handleValorSensor);  // 👈 esta linea
   adminServer.begin();
   Serial.println("Servidor privado en puerto 8080 listo.");
 }

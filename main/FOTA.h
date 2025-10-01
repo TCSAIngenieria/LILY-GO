@@ -5,7 +5,7 @@
 
 class FOTAClass {
 public:
-    // Inicia la actualización OTA con la URL
+    // Inicia la actualizacion OTA con la URL
     void startUpdate(const String& url);
 };
 
