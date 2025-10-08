@@ -25,6 +25,7 @@
 #include "ADC.h"
 #include "FOTA.h"
 #include "GPRS.h"
+#include "Modbus.h"
 
 #ifdef DUMP_AT_COMMANDS
   #include <StreamDebugger.h>
@@ -69,6 +70,7 @@ unsigned long numeroPaquete = 0;
 //Habilitacion modulos
 extern uint en_sensor;
 extern uint en_serial;
+extern uint en_modbus;
 
 
 //WIFI
@@ -149,8 +151,26 @@ unsigned long last_flash_read = 0;
 void setup() {
   SerialMon.begin(115200);  //puerto serial primario
   SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-  SensorSerial.begin(115200, SERIAL_8N1, 32, 33); // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
+  SensorSerial.begin(4800, SERIAL_8N1, 32, 33); // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
 
+  // Inicializar Modbus sobre el puerto secundario
+  modbus_begin(&SensorSerial);
+  modbus_load_from_prefs();
+
+  preferences.begin("enables", true);
+  en_sensor = preferences.getUInt("sensor", 0);
+  en_serial = preferences.getUInt("serial", 0);
+  en_modbus = preferences.getUInt("modbus", 0);
+  preferences.end();
+
+  if (en_modbus) {
+    modbus_set_enabled(true);
+    en_serial = 0; // Exclusión mutua
+  }
+  if(en_serial) {
+    pinMode(SENSOR_POWER_PIN, OUTPUT);
+    digitalWrite(SENSOR_POWER_PIN, HIGH);  // La expansora arranca encendida
+  }
 
   /*ACA TENGO QUE PONER EL SENSOR QUE VOY A UTILIZAR*/
   sensor = new DS18B20();
@@ -235,15 +255,9 @@ void setup() {
   String storedURL = preferences.getString("url", "");
   preferences.end();
 
-  preferences.begin("enables", true); //modo lectura
-  en_sensor = preferences.getUInt("sensor", 0);
-  en_serial = preferences.getUInt("serial", 0);
-  preferences.end();
 
-  if(en_serial){
-    pinMode(SENSOR_POWER_PIN, OUTPUT);
-    digitalWrite(SENSOR_POWER_PIN, HIGH);  // La expansora arranca encendida
-    }
+
+ 
 
 
   if (storedURL.length() == 0) {
@@ -610,6 +624,26 @@ if (mqtt.connected()) {
 
 }
 
+else if (en_modbus==1) {
+    unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+    String jsonmodbus = create_mqtt_json_modbus(
+        topic1, ident, printCurrentTime(), ultimaLat, ultimaLon,
+        leer_tension_bateria(), leer_tension_principal(), numPkt
+    );
+
+    if (mqtt.connected()) {
+        if (topic1.length() == 0 || jsonmodbus.length() == 0) {
+            Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+        } else {
+            if (publish_mqtt_json(topic1, jsonmodbus)) {
+                mqttUltimaConexionOK = millis();
+            }
+        }
+    } else {
+        flash_save_packet(jsonmodbus.c_str());
+    }
+}
+
     esp_task_wdt_reset();
   }
 
@@ -626,7 +660,17 @@ if (mqttActivo && millis() - mqttUltimaConexionOK > MQTT_TIMEOUT) {
   // ---- OTRAS FUNCIONES ----
   
   escucharComandos();
-  leerSensorSerial(SensorSerial);
+
+  // Solo leo SerialSecundario si está habilitado EN_SERIAL
+  if (en_serial) {
+    leerSensorSerial(SensorSerial);
+  }
+
+  // Solo ciclo Modbus si está habilitado
+  if (en_modbus && modbus_get_enabled()) {
+    modbus_loop();
+  }
+
   actualizarLED();
   esp_task_wdt_reset();  // Alimenta el WDT
   

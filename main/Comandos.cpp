@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include "FOTA.h"
 #include "DS18B20.h"
+#include "Modbus.h"
 
 
 extern Preferences preferences;
@@ -20,6 +21,7 @@ extern HardwareSerial SensorSerial;
 
 uint en_sensor;
 uint en_serial;
+uint en_modbus;
 
 
 extern unsigned long publishInterval;
@@ -111,6 +113,93 @@ String procesarComando(String comando) {
     preferences.putUInt("serial", en_serial);
     preferences.end();
     respuesta = ">> HABILITADO LECTURA SERIAL";
+  }/*comando para habilitar MODBUS (excluyente con EN_SERIAL)*/
+  else if (comando.startsWith("DVL+EN_MODBUS=")) {
+    String v = comando.substring(String("DVL+EN_MODBUS=").length());
+    v.trim();
+    en_modbus = (v == "1") ? 1 : 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("modbus", en_modbus);
+    if (en_modbus == 1) {
+      en_serial = 0;                     // Exclusión
+      preferences.putUInt("serial", 0);
+      modbus_set_enabled(true);
+      respuesta = ">> HABILITADO MODBUS (EN_SERIAL=0)";
+    } else {
+      modbus_set_enabled(false);
+      respuesta = ">> DESHABILITADO MODBUS";
+    }
+    preferences.end();
+  }
+
+  /* comando para configurar tramas:
+     DVL+MODBUS=idx,ID,FUNC,LONG
+     idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
+  */
+  else if (comando.startsWith("DVL+MODBUS=")) {
+  String args = comando.substring(String("DVL+MODBUS=").length());
+  args.trim();
+
+  int c1 = args.indexOf(',');
+  int c2 = (c1 >= 0) ? args.indexOf(',', c1+1) : -1;
+  int c3 = (c2 >= 0) ? args.indexOf(',', c2+1) : -1;
+  int c4 = (c3 >= 0) ? args.indexOf(',', c3+1) : -1;
+
+  if (c1<0 || c2<0 || c3<0 || c4<0) {
+    respuesta = "[ERR] Formato: DVL+MODBUS=idx,ID,FUNC,ADDR,QTY";
+  } else {
+    auto parseAny = [](const String& s)->long { return strtol(s.c_str(), nullptr, 0); };
+
+    uint8_t idx  = (uint8_t)parseAny(args.substring(0, c1));
+    uint8_t id   = (uint8_t)parseAny(args.substring(c1+1, c2));
+    uint8_t func = (uint8_t)parseAny(args.substring(c2+1, c3));
+    uint16_t addr = (uint16_t)parseAny(args.substring(c3+1, c4));
+    uint16_t qty  = (uint16_t)parseAny(args.substring(c4+1));
+
+    if (idx < 1 || idx > 5) {
+      respuesta = "[ERR] idx debe ser 1..5";
+    } else {
+      bool ok = modbus_set_frame(idx, id, func, addr, qty);
+      if (ok) {
+        respuesta = "[OK] MODBUS#" + String(idx) + 
+                    " ID=0x" + String(id,HEX) + 
+                    " FUNC=0x" + String(func,HEX) + 
+                    " ADDR=0x" + String(addr,HEX) + 
+                    " QTY=0x" + String(qty,HEX);
+      } else {
+        respuesta = "[ERR] No se pudo guardar la trama";
+      }
+    }
+  }
+}
+
+  /* limpiar tramas: DVL+MODBUSCLR=idx | DVL+MODBUSCLR=ALL */
+  else if (comando.startsWith("DVL+MODBUSCLR=")) {
+    String arg = comando.substring(String("DVL+MODBUSCLR=").length());
+    arg.trim();
+    bool ok = false;
+    if (arg.equalsIgnoreCase("ALL")) {
+      ok = modbus_clear_frame(0);
+      respuesta = ok ? "[OK] Todas las tramas Modbus borradas" : "[ERR] No se pudo borrar";
+    } else {
+      uint8_t idx = (uint8_t)strtol(arg.c_str(), nullptr, 0);
+      ok = modbus_clear_frame(idx);
+      respuesta = ok ? "[OK] Trama Modbus #" + String(idx) + " borrada" : "[ERR] idx invalido";
+    }
+  }
+
+  /* consultas */
+  else if (comando == "DVL+QEN_MODBUS") {
+    preferences.begin("enables", true);
+    en_modbus = preferences.getUInt("modbus", 0);
+    preferences.end();
+    respuesta = "EN_MODBUS=" + String(en_modbus);
+  }
+  else if (comando == "DVL+QMODBUS") {
+    // Volcamos a Serial y devolvemos un breve resumen
+    modbus_print_frames();
+    respuesta = "[OK] Ver detalle por Serial";
   } else if (comando == "DVL+RESET") {
     respuesta = ">> Reiniciando dispositivo...";
     Serial.println(respuesta);  // Lo mostramos antes del reset

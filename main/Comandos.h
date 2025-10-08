@@ -3,6 +3,7 @@
 
 #include <Arduino.h>  // <- NECESARIO para que reconozca String, etc.
 
+
 String procesarComando(String comando);
 String getStartMarker();
 String getEndMarker();

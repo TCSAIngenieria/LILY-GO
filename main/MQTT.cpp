@@ -3,7 +3,8 @@
 #include <Preferences.h>
 #include "Comandos.h"
 #include "FOTA.h"
-
+#include "Modbus.h"
+#include "esp_task_wdt.h"
 
 #define LED_PIN     12
 const char *topicInit       = "LilyGo/topicInit";
@@ -19,6 +20,8 @@ extern Preferences preferences;
 
 extern bool mqttActivo;
 extern unsigned long mqttUltimaConexionOK;
+
+extern String modbus_lastValues[MODBUS_MAX_FRAMES];
 
 
 
@@ -158,6 +161,35 @@ String S6, String S7, String S8, String S9, String S10, String S11, String S12, 
     doc["S13"] = S13;
     doc["S14"] = S14;
     doc["S15"] = S15;
+    doc["date"] = fechayhora;
+    doc["latitud"] = latitud;
+    doc["longitud"] = longitud;
+    doc["Tension_bateria"] = Vbateria;
+    doc["Tension_principal"] = Vprincipal;
+    doc["Version"] = versionado;
+    doc["index"] = numeroPaquete;
+
+    char payload[512];
+    serializeJson(doc, payload);
+    return String(payload);
+}
+
+
+String create_mqtt_json_modbus(String topic, String ident,
+                               String fechayhora, String latitud, String longitud,
+                               float Vbateria, float Vprincipal,
+                               unsigned long numeroPaquete) {
+    StaticJsonDocument<512> doc;
+    doc["ident"] = ident;
+
+    // Recorrer las consultas configuradas
+    for (int i = 0; i < MODBUS_MAX_FRAMES; i++) {
+        if (modbus_lastValues[i].length() > 0) {
+            String key = "INDEX" + String(i+1);
+            doc[key] = modbus_lastValues[i];
+        }
+    }
+
     doc["date"] = fechayhora;
     doc["latitud"] = latitud;
     doc["longitud"] = longitud;
