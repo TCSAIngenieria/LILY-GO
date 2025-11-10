@@ -1,7 +1,7 @@
 #include "ADC.h"
 
-#define ADC_PIN_BAT  34  // Ejemplo pin ADC para bateria (18650)
-#define ADC_PIN_5V   32  // Ya no se usara directamente
+#define ADC_PIN_BAT 34       // Ejemplo pin ADC para bateria (18650)
+#define ADC_PIN_ADC1_CH7 35  // Pin ADC1_CH7
 
 float readVoltage(int pin) {
   int adcValue = analogRead(pin);
@@ -11,8 +11,7 @@ float readVoltage(int pin) {
 
 void initADC() {
   analogReadResolution(12);
-  analogSetPinAttenuation(ADC_PIN_BAT, ADC_11db); // Hasta 3.3V
-  // ADC_PIN_5V no se usa mas porque vamos a estimar en base al voltaje de bateria
+  analogSetPinAttenuation(ADC_PIN_BAT, ADC_11db);  // Hasta 3.3V
 }
 
 float leer_tension_bateria() {
@@ -39,4 +38,14 @@ float leer_tension_principal() {
     Serial.println("Alimentacion principal estimada: 0.0 V");
     return 0.0;
   }
+}
+
+float leer_tension_adc1_ch7() {
+  float raw = readVoltage(ADC_PIN_ADC1_CH7);
+
+  Serial.print("Voltaje ADC2_0 leido: ");
+  Serial.print(raw);
+  Serial.println(" V");
+
+  return raw;
 }

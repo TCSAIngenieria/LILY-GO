@@ -7,11 +7,11 @@
 #define MODBUS_MAX_FRAMES 25
 
 typedef struct {
-  uint8_t  id;
-  uint8_t  func;
+  uint8_t id;
+  uint8_t func;
   uint16_t addr;
   uint16_t qty;
-  bool     used;
+  bool used;
 } ModbusFrameCfg;
 
 // API
@@ -27,7 +27,6 @@ void modbus_load_from_prefs();
 
 void modbus_print_frames();
 void modbus_loop();
-
 
 extern String modbus_lastValues[MODBUS_MAX_FRAMES];
 

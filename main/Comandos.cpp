@@ -1,6 +1,6 @@
 #include "Comandos.h"
 #include "Flash.h"
-#include "GNSS.h" // Para setLatitude, setLongitude, setLocationValid
+#include "GNSS.h"  // Para setLatitude, setLongitude, setLocationValid
 #include <Preferences.h>
 #include "FOTA.h"
 #include "DS18B20.h"
@@ -15,7 +15,7 @@ extern String versionado;
 extern String ident;
 extern String topic1;
 char separator = ',';
-String sensorValues[16]; // S0...S15
+String sensorValues[16];  // S0...S15
 
 extern HardwareSerial SensorSerial;
 
@@ -23,19 +23,14 @@ uint en_sensor;
 uint en_serial;
 uint en_modbus;
 
-
 extern unsigned long publishInterval;
-
-
 extern FOTAClass FOTA;
-
 
 String procesarComando(String comando) {
   comando.trim();
   String respuesta = "";
-  
 
-  /* COMANDO LATITUD */ 
+  /* COMANDO LATITUD */
   if (comando.startsWith("DVL+SLAT=")) {
     String nuevaLat = comando.substring(9);
     guardar_en_flash("lat", nuevaLat);
@@ -44,7 +39,7 @@ String procesarComando(String comando) {
     setLocationValid(true);
     respuesta = "RLAT_OK";
 
-  /* COMANDO LONGITUD */ 
+    /* COMANDO LONGITUD */
   } else if (comando.startsWith("DVL+SLONG=")) {
     String nuevaLon = comando.substring(10);
     guardar_en_flash("lon", nuevaLon);
@@ -53,7 +48,7 @@ String procesarComando(String comando) {
     setLocationValid(true);
     respuesta = "RLONG_OK";
 
-  /* COMANDOS TRAMA DATOS */ 
+    /* COMANDOS TRAMA DATOS */
   } else if (comando.startsWith("DVL+SFINI=")) {
     startMarker = comando.substring(10);
     guardarConfiguracionParser();
@@ -70,14 +65,14 @@ String procesarComando(String comando) {
     respuesta = "[OK] Separador: " + String(separator);
 
 
-  /* COMANDOS TIEMPO PUBLICACIoN DATOS */
+    /* COMANDOS TIEMPO PUBLICACIoN DATOS */
   } else if (comando.startsWith("DVL+STIME=")) {
     String publishInterval_s = comando.substring(10);
     guardar_en_flash("time", publishInterval_s);
     publishInterval = strtoul(publishInterval_s.c_str(), NULL, 10);
     respuesta = "TIEMPO SETEADO OK";
 
-  /* COMANDO ID */ 
+    /* COMANDO ID */
   } else if (comando.startsWith("DVL+ID=")) {
     String ident_s = comando.substring(7);
     guardar_en_flash("ident", ident_s);
@@ -98,7 +93,7 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+VER") {
     respuesta = "VERSION=" + versionado;
 
-/*comando para habilitar sensor*/
+    /*comando para habilitar sensor*/
   } else if (comando.startsWith("DVL+EN_SENSOR")) {
     en_sensor = 1;
     preferences.begin("enables", false);
@@ -106,14 +101,14 @@ String procesarComando(String comando) {
     preferences.end();
     respuesta = ">> HABILITADO LECTURA SENSOR";
 
-/*comando para habilitar puerto serial secundario*/
+    /*comando para habilitar puerto serial secundario*/
   } else if (comando.startsWith("DVL+EN_SERIAL")) {
     en_serial = 1;
     preferences.begin("enables", false);
     preferences.putUInt("serial", en_serial);
     preferences.end();
     respuesta = ">> HABILITADO LECTURA SERIAL";
-  }/*comando para habilitar MODBUS (excluyente con EN_SERIAL)*/
+  } /*comando para habilitar MODBUS (excluyente con EN_SERIAL)*/
   else if (comando.startsWith("DVL+EN_MODBUS=")) {
     String v = comando.substring(String("DVL+EN_MODBUS=").length());
     v.trim();
@@ -122,7 +117,7 @@ String procesarComando(String comando) {
     preferences.begin("enables", false);
     preferences.putUInt("modbus", en_modbus);
     if (en_modbus == 1) {
-      en_serial = 0;                     // Exclusión
+      en_serial = 0;  // Exclusión
       preferences.putUInt("serial", 0);
       modbus_set_enabled(true);
       respuesta = ">> HABILITADO MODBUS (EN_SERIAL=0)";
@@ -138,41 +133,39 @@ String procesarComando(String comando) {
      idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
   */
   else if (comando.startsWith("DVL+MODBUS=")) {
-  String args = comando.substring(String("DVL+MODBUS=").length());
-  args.trim();
+    String args = comando.substring(String("DVL+MODBUS=").length());
+    args.trim();
 
-  int c1 = args.indexOf(',');
-  int c2 = (c1 >= 0) ? args.indexOf(',', c1+1) : -1;
-  int c3 = (c2 >= 0) ? args.indexOf(',', c2+1) : -1;
-  int c4 = (c3 >= 0) ? args.indexOf(',', c3+1) : -1;
+    int c1 = args.indexOf(',');
+    int c2 = (c1 >= 0) ? args.indexOf(',', c1 + 1) : -1;
+    int c3 = (c2 >= 0) ? args.indexOf(',', c2 + 1) : -1;
+    int c4 = (c3 >= 0) ? args.indexOf(',', c3 + 1) : -1;
 
-  if (c1<0 || c2<0 || c3<0 || c4<0) {
-    respuesta = "[ERR] Formato: DVL+MODBUS=idx,ID,FUNC,ADDR,QTY";
-  } else {
-    auto parseAny = [](const String& s)->long { return strtol(s.c_str(), nullptr, 0); };
-
-    uint8_t idx  = (uint8_t)parseAny(args.substring(0, c1));
-    uint8_t id   = (uint8_t)parseAny(args.substring(c1+1, c2));
-    uint8_t func = (uint8_t)parseAny(args.substring(c2+1, c3));
-    uint16_t addr = (uint16_t)parseAny(args.substring(c3+1, c4));
-    uint16_t qty  = (uint16_t)parseAny(args.substring(c4+1));
-
-    if (idx < 1 || idx > 5) {
-      respuesta = "[ERR] idx debe ser 1..5";
+    if (c1 < 0 || c2 < 0 || c3 < 0 || c4 < 0) {
+      respuesta = "[ERR] Formato: DVL+MODBUS=idx,ID,FUNC,ADDR,QTY";
     } else {
-      bool ok = modbus_set_frame(idx, id, func, addr, qty);
-      if (ok) {
-        respuesta = "[OK] MODBUS#" + String(idx) + 
-                    " ID=0x" + String(id,HEX) + 
-                    " FUNC=0x" + String(func,HEX) + 
-                    " ADDR=0x" + String(addr,HEX) + 
-                    " QTY=0x" + String(qty,HEX);
+      auto parseAny = [](const String& s) -> long {
+        return strtol(s.c_str(), nullptr, 0);
+      };
+
+      uint8_t idx = (uint8_t)parseAny(args.substring(0, c1));
+      uint8_t id = (uint8_t)parseAny(args.substring(c1 + 1, c2));
+      uint8_t func = (uint8_t)parseAny(args.substring(c2 + 1, c3));
+      uint16_t addr = (uint16_t)parseAny(args.substring(c3 + 1, c4));
+      uint16_t qty = (uint16_t)parseAny(args.substring(c4 + 1));
+
+      if (idx < 1 || idx > 5) {
+        respuesta = "[ERR] idx debe ser 1..5";
       } else {
-        respuesta = "[ERR] No se pudo guardar la trama";
+        bool ok = modbus_set_frame(idx, id, func, addr, qty);
+        if (ok) {
+          respuesta = "[OK] MODBUS#" + String(idx) + " ID=0x" + String(id, HEX) + " FUNC=0x" + String(func, HEX) + " ADDR=0x" + String(addr, HEX) + " QTY=0x" + String(qty, HEX);
+        } else {
+          respuesta = "[ERR] No se pudo guardar la trama";
+        }
       }
     }
   }
-}
 
   /* limpiar tramas: DVL+MODBUSCLR=idx | DVL+MODBUSCLR=ALL */
   else if (comando.startsWith("DVL+MODBUSCLR=")) {
@@ -195,8 +188,7 @@ String procesarComando(String comando) {
     en_modbus = preferences.getUInt("modbus", 0);
     preferences.end();
     respuesta = "EN_MODBUS=" + String(en_modbus);
-  }
-  else if (comando == "DVL+QMODBUS") {
+  } else if (comando == "DVL+QMODBUS") {
     // Volcamos a Serial y devolvemos un breve resumen
     modbus_print_frames();
     respuesta = "[OK] Ver detalle por Serial";
@@ -209,11 +201,11 @@ String procesarComando(String comando) {
     respuesta = ">> Reiniciando expansora...";
     Serial.println(respuesta);
     digitalWrite(SENSOR_POWER_PIN, LOW);   // Apaga la expansora
-    delay(1000);                            // Espera 1 segundo
+    delay(1000);                           // Espera 1 segundo
     digitalWrite(SENSOR_POWER_PIN, HIGH);  // Vuelve a encenderla
 
 
-/*COMANDOS DE CONSULTA*/
+    /*COMANDOS DE CONSULTA*/
   } else if (comando == "DVL+QTIME") {
     respuesta = "TIME=" + String(publishInterval);
 
@@ -243,27 +235,28 @@ String procesarComando(String comando) {
     en_serial = preferences.getUInt("serial", 0);
     preferences.end();
     respuesta = "EN_SERIAL=" + String(en_serial);
-    
-    } else if (comando.startsWith("EXP+")) {
-  // Reenvia el comando al puerto serial secundario
-  SensorSerial.println(comando);
 
-  // Esperar y leer respuesta de la expansora
-  unsigned long startTime = millis();
-  String respuestaExp = "";
+  } else if (comando.startsWith("EXP+")) {
+    // Reenvia el comando al puerto serial secundario
+    SensorSerial.println(comando);
 
-  while (millis() - startTime < 5000) { // espera hasta 500 ms
-    while (SensorSerial.available()) {
-      char c = SensorSerial.read();
-      respuestaExp += c;
+    // Esperar y leer respuesta de la expansora
+    unsigned long startTime = millis();
+    String respuestaExp = "";
+
+    while (millis() - startTime < 5000) {  // espera hasta 500 ms
+      while (SensorSerial.available()) {
+        char c = SensorSerial.read();
+        respuestaExp += c;
+      }
     }
-  }
 
-  if (respuestaExp.length() > 0) {
-    respuesta = "RESP_EXPANSORA: " + respuestaExp;
+    if (respuestaExp.length() > 0) {
+      respuesta = "RESP_EXPANSORA: " + respuestaExp;
+    } else {
+      respuesta = "[WARN] No se recibio respuesta de la expansora.";
+    }
   } else {
-    respuesta = "[WARN] No se recibio respuesta de la expansora.";
-  }} else {
     respuesta = "[ERR] Comando no reconocido.";
   }
 
@@ -272,10 +265,8 @@ String procesarComando(String comando) {
   return respuesta;
 }
 
-
-
 void guardarConfiguracionParser() {
-  preferences.begin("parser", false);    //Abre un espacio (namespace) llamado "parser" para escribir (false significa modo escritura).
+  preferences.begin("parser", false);  //Abre un espacio (namespace) llamado "parser" para escribir (false significa modo escritura).
   preferences.putString("start", startMarker);
   preferences.putString("end", endMarker);
   preferences.putUChar("sep", separator);
@@ -284,7 +275,7 @@ void guardarConfiguracionParser() {
 
 void cargarConfiguracionParser() {
   preferences.begin("parser", true);
-  startMarker = preferences.getString("start", "DATA,"); //esto carga los datos escritos en memoria. El primer parametro es la 'clave' con el que se guarda esa variable en flash, y el segundo, se usa como valor si no hay nada guardado en la flash
+  startMarker = preferences.getString("start", "DATA,");  //esto carga los datos escritos en memoria. El primer parametro es la 'clave' con el que se guarda esa variable en flash, y el segundo, se usa como valor si no hay nada guardado en la flash
   endMarker = preferences.getString("end", "\r");
   separator = preferences.getUChar("sep", ',');
   preferences.end();
@@ -306,10 +297,6 @@ String* getSensorValues() {
   return sensorValues;
 }
 
-  
-
-
-
 void escucharComandos() {
   while (Serial.available()) {
     String comando = Serial.readStringUntil('\n');
@@ -319,5 +306,3 @@ void escucharComandos() {
     }
   }
 }
-
-

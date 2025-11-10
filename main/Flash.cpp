@@ -7,7 +7,7 @@ Preferences prefs;
 // Configuracion de SPIFFS
 #define FORMAT_SPIFFS_IF_FAILED true
 
-// Variables globales 
+// Variables globales
 String ultimaLat = "-33.123456";
 String ultimaLon = "-64.123456";
 extern String ident;
@@ -21,24 +21,27 @@ static int readIndex = 0;
 static char currentPacket[MAX_PACKET_SIZE];  // paquete leido temporalmente
 static bool packetLoaded = false;
 
-
-
 void lectura_flash() {
+  
   Serial.println("Leyendo datos almacenados en flash...");
 
   ultimaLat = leer_de_flash("lat");
   ultimaLon = leer_de_flash("lon");
   spublishInterval = leer_de_flash("time");
-  publishInterval = strtoul(spublishInterval.c_str(), NULL, 10);
-
-  ident = leer_de_flash("ident");
+  if (spublishInterval != "N/A" && spublishInterval.length() > 0) {
+    unsigned long temp = strtoul(spublishInterval.c_str(), NULL, 10);
+    if (temp > 0) {
+      publishInterval = temp;
+    }
+  }
 
   Serial.print("ultima Latitud guardada: ");
   Serial.println(ultimaLat);
   Serial.print("ultima Longitud guardada: ");
   Serial.println(ultimaLon);
   Serial.print("ultima ultimo publish_time guardado: ");
-  Serial.println(spublishInterval);Serial.print(publishInterval);
+  Serial.println(spublishInterval);
+  Serial.print(publishInterval);
 }
 
 void guardar_en_flash(const String& clave, const String& valor) {
@@ -65,15 +68,13 @@ String leer_de_flash(const String& clave, const String& valorPorDefecto) {
   return resultado;
 }
 
-
 void flash_init() {
   // Iniciar SPIFFS
-  if(!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
+  if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
     Serial.println("Error mount SPIFFS");
-    
   }
   // Iniciar Preferences
-  if(prefs.begin("flash_buf", true)) { // lectura
+  if (prefs.begin("flash_buf", true)) {  // lectura
     writeIndex = prefs.getInt("widx", 0);
     readIndex = prefs.getInt("ridx", 0);
     prefs.end();
@@ -82,24 +83,14 @@ void flash_init() {
   }
 }
 
-
-
-
 bool flash_buffer_full() {
   return ((writeIndex + 1) % MAX_PACKETS) == readIndex;
 }
-
-
-
 
 // Retorna true si el buffer esta vacio
 bool flash_buffer_empty() {
   return writeIndex == readIndex;
 }
-
-
-
-
 
 bool flash_save_packet(const char* json) {
   if (flash_buffer_full()) {
@@ -123,7 +114,7 @@ bool flash_save_packet(const char* json) {
   writeIndex = (writeIndex + 1) % MAX_PACKETS;
 
   // Guardar indices en Preferences
-  if(prefs.begin("flash_buf", false)) {
+  if (prefs.begin("flash_buf", false)) {
     prefs.putInt("widx", writeIndex);
     prefs.putInt("ridx", readIndex);  // actualiza tambien el readIndex si se piso
     prefs.end();
@@ -132,9 +123,6 @@ bool flash_save_packet(const char* json) {
   Serial.printf("Guardado paquete en flash index=%d\n", (writeIndex == 0) ? MAX_PACKETS - 1 : writeIndex - 1);
   return true;
 }
-
-
-
 
 const char* flash_get_next_packet() {
   if (flash_buffer_empty()) return nullptr;
@@ -163,10 +151,6 @@ const char* flash_get_next_packet() {
   return currentPacket;
 }
 
-
-
-
-
 void flash_mark_packet_sent() {
   if (flash_buffer_empty()) return;
 
@@ -179,7 +163,7 @@ void flash_mark_packet_sent() {
   packetLoaded = false;
 
   // Guardar indice en Preferences
-  if(prefs.begin("flash_buf", false)) {
+  if (prefs.begin("flash_buf", false)) {
     prefs.putInt("ridx", readIndex);
     prefs.end();
   }

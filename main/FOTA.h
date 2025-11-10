@@ -5,12 +5,10 @@
 
 class FOTAClass {
 public:
-    // Inicia la actualizacion OTA con la URL
-    void startUpdate(const String& url);
+  // Inicia la actualizacion OTA con la URL
+  void startUpdate(const String& url);
 };
 
 extern FOTAClass FOTA;
-
-
 
 #endif

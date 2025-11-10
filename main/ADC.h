@@ -7,6 +7,7 @@
 
 float leer_tension_bateria();
 float leer_tension_principal();
+float leer_tension_adc1_ch7();
 void initADC();
 
 #endif

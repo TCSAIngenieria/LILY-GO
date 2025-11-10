@@ -1,5 +1,5 @@
 #define TINY_GSM_MODEM_SIM7000
-#define TINY_GSM_RX_BUFFER 1024 // Set RX buffer to 1Kb
+#define TINY_GSM_RX_BUFFER 1024  // Set RX buffer to 1Kb
 
 #define SerialAT Serial1
 #define SerialMon Serial
@@ -27,15 +27,14 @@
 #include "GPRS.h"
 #include "Modbus.h"
 
+
 #ifdef DUMP_AT_COMMANDS
-  #include <StreamDebugger.h>
-  StreamDebugger debugger(SerialAT, SerialMon);
-  TinyGsm modem(debugger);
+#include <StreamDebugger.h>
+StreamDebugger debugger(SerialAT, SerialMon);
+TinyGsm modem(debugger);
 #else
-  TinyGsm modem(SerialAT);
+TinyGsm modem(SerialAT);
 #endif
-
-
 
 WiFiClient espClient;
 TinyGsmClient gsmClient(modem);
@@ -43,27 +42,25 @@ TinyGsmClient gsmClient(modem);
 // Cliente MQTT comun para los dos tipos de conectividad
 PubSubClient mqtt(espClient);  // lo inicializamos con uno cualquiera
 
-HardwareSerial SensorSerial(2); // UART2
+HardwareSerial SensorSerial(2);  // UART2
 
 #define LED_PIN 2
 #define WDT_TIMEOUT 120  // segundos para que reinicie por watchdog
 
-
-String versionado = "V1";
+String versionado = "V01.03.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
 bool ledState = false;
 bool mqttActivo = false;
 unsigned long mqttUltimaConexionOK = 0;
-const unsigned long MQTT_TIMEOUT = 300000; // 5 minutos
+const unsigned long MQTT_TIMEOUT = 300000;  // 5 minutos
 
 unsigned long lastMqttResubscribe = 0;
-const unsigned long mqttResubscribeInterval = 10000; // cada 10 segundos
-
+const unsigned long mqttResubscribeInterval = 10000;  // cada 10 segundos
 
 //Variables generales
-String ident="";
+String ident = "";
 String topic1;
 unsigned long numeroPaquete = 0;
 
@@ -72,48 +69,40 @@ extern uint en_sensor;
 extern uint en_serial;
 extern uint en_modbus;
 
-
 //WIFI
 extern bool wifiConfigurado;
 unsigned long configure_wifi_time = 0;
 
 Preferences preferences;
 
-
 //Valores puerto serial secundario;
 extern String sensorValues[16];
 
-
-
 // Credenciales GPRS
-const char apn[]  = "igprs.claro.com.ar";     // APN
+const char apn[] = "igprs.claro.com.ar";  // APN
 const char gprsUser[] = "";
 const char gprsPass[] = "";
 
-
 //conectividad
-bool TINY_GSM_USE_GPRS = true;           // uso del gprs
-bool TINY_GSM_USE_WIFI = false;         // uso del wifi
-
+bool TINY_GSM_USE_GPRS = true;   // uso del gprs
+bool TINY_GSM_USE_WIFI = false;  // uso del wifi
 
 // Control de fases
-bool faseGPS = true;           // Empezamos buscando latitud/longitud
-bool faseGPRS_WIFI = false;         // Activamos GPRS luego del GPS
-bool relojActualizado = false; // Indica si ya se actualizo el reloj desde NTP
+bool faseGPS = true;            // Empezamos buscando latitud/longitud
+bool faseGPRS_WIFI = false;     // Activamos GPRS luego del GPS
+bool relojActualizado = false;  // Indica si ya se actualizo el reloj desde NTP
 
 /*Tiempo de busqueda de latitud y longitud de GPS al inicio*/
 unsigned long tiempoInicioGPS = 0;
-const unsigned long tiempoLimiteGPS = 0UL * 60UL * 1000UL; // 1 minutos
+const unsigned long tiempoLimiteGPS = 0UL * 60UL * 1000UL;  // 1 minutos
 
 ///*Tiempo de actualizacion de Hora*/
 unsigned long ultimaActualizacionNTP = 0;
-const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
+const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL;  // 8 horas
 
 /*Variables para reinicio de modem si no se inicia bien*/
 int contadorErroresModem = 0;
 const int limiteErroresModem = 5;
-
-
 
 /* Posicion  */
 extern String ultimaLat;
@@ -128,30 +117,26 @@ extern unsigned long publishInterval;  //intervalo de publicacion del dato //60 
 unsigned long lastReconnectAttempt = 0;
 
 /*BOToN MODO AP*/
-#define AP_BUTTON_PIN 0  // GPIO del boton (ejemplo: GPIO 0)
+#define AP_BUTTON_PIN 0         // GPIO del boton (ejemplo: GPIO 0)
 #define BUTTON_PRESS_TIME 5000  // 5 segundos
 unsigned long buttonPressStartTime = 0;
 bool buttonWasPressed = false;
 
 /* Sensor */
-SensorInterface* sensor;;
+SensorInterface* sensor;
+;
 unsigned long last_Sensor_read = 0;
-const unsigned long Sensor_read_Interval= 5000; //intervalo de lectura de sensor //5 segundos por default
+const unsigned long Sensor_read_Interval = 5000;  //intervalo de lectura de sensor //5 segundos por default
 String valorStr = "";
 
 /*Lectura de paquetes en flash*/
-const unsigned long Packets_read_Interval= 2000;
+const unsigned long Packets_read_Interval = 2000;
 unsigned long last_flash_read = 0;
-
-
-
-
-
 
 void setup() {
   SerialMon.begin(115200);  //puerto serial primario
   SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
-  SensorSerial.begin(4800, SERIAL_8N1, 32, 33); // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
+  SensorSerial.begin(4800, SERIAL_8N1, 32, 33);  // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
 
   // Inicializar Modbus sobre el puerto secundario
   modbus_begin(&SensorSerial);
@@ -165,9 +150,10 @@ void setup() {
 
   if (en_modbus) {
     modbus_set_enabled(true);
-    en_serial = 0; // Exclusión mutua
+    en_serial = 0;  // Exclusión mutua
   }
-  if(en_serial) {
+
+  if (en_serial) {
     pinMode(SENSOR_POWER_PIN, OUTPUT);
     digitalWrite(SENSOR_POWER_PIN, HIGH);  // La expansora arranca encendida
   }
@@ -175,34 +161,28 @@ void setup() {
   /*ACA TENGO QUE PONER EL SENSOR QUE VOY A UTILIZAR*/
   sensor = new DS18B20();
 
-
-  modemPowerOn();   // Enciendo el modem celular
+  modemPowerOn();  // Enciendo el modem celular
 
   static const esp_task_wdt_config_t wdt_config = {
     .timeout_ms = WDT_TIMEOUT * 1000,
-    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // ambos cores
+    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,  // ambos cores
     .trigger_panic = true
   };
 
-  
-
   // Inicializa el watchdog
-  esp_task_wdt_delete(NULL);  // Elimina la tarea actual del watchdog anterior
-  esp_task_wdt_deinit();      // Desactiva completamente el WDT actual
+  esp_task_wdt_delete(NULL);       // Elimina la tarea actual del watchdog anterior
+  esp_task_wdt_deinit();           // Desactiva completamente el WDT actual
   esp_task_wdt_init(&wdt_config);  // Ahora si, lo inicializa con 120 segundos
-  esp_task_wdt_add(NULL);     // Agrega la tarea actual al nuevo WDT
-  
+  esp_task_wdt_add(NULL);          // Agrega la tarea actual al nuevo WDT
+
   flash_init();
   initADC();
-  
-  
 
   //Inicializacion del sensor
   sensor->begin();
-  
-  // Seteo el LED output
-  pinMode(LED_PIN, OUTPUT); // Seteo el LED OFF
 
+  // Seteo el LED output
+  pinMode(LED_PIN, OUTPUT);  // Seteo el LED OFF
 
   /*BOToN AP*/
   pinMode(AP_BUTTON_PIN, INPUT_PULLUP);  // Boton con logica inversa (presionado = LOW)
@@ -214,11 +194,10 @@ void setup() {
   Serial.print("TOPIC MQTT: ");
   Serial.println(topic1);
 
-
   /*CONFIGURACIoN WEB SERVER ADMIN*/
   preferences.begin("mqtt", true);
   MQTT_BROKER = preferences.getString("ip", "iot.tcsa.com.ar");  // ← solo usa este si no hay guardado
-  MQTT_PORT = preferences.getInt("port", 1883);                // ← idem
+  MQTT_PORT = preferences.getInt("port", 1883);                  // ← idem
   preferences.end();
 
   /*BROKER MQTT*/
@@ -227,68 +206,71 @@ void setup() {
   Serial.print("  Puerto: ");
   Serial.println(MQTT_PORT);
 
-
   /*CONFIGURACION WIFI*/
   preferences.begin("wifi", true);
-  ssid = preferences.getString("ssid", "Invitados");
-  password = preferences.getString("password", "TCinvitados");
+  ssid = preferences.getString("ssid", "Flash-PaPeR");
+  password = preferences.getString("password", "Ayanami84");
   preferences.end();
 
   if (ssid.length() > 0) {
-  conectar_WiFi();
-}
-
+    conectar_WiFi();
+  }
 
   lectura_flash();
   cargarConfiguracionParser();
 
-  
   /*Configuracion MQTT*/
-  mqtt.setSocketTimeout(60);   // Espera hasta 60 segundos para conectarse
-  mqtt.setKeepAlive(60);       // Envia un ping cada 60 segundos si no hay actividad
+  mqtt.setSocketTimeout(60);  // Espera hasta 60 segundos para conectarse
+  mqtt.setKeepAlive(60);      // Envia un ping cada 60 segundos si no hay actividad
   mqtt.setBufferSize(512);
   mqtt.setServer(MQTT_BROKER.c_str(), MQTT_PORT);
   mqtt.setCallback(mqttCallback);
-
 
   preferences.begin("fota", true);
   String storedURL = preferences.getString("url", "");
   preferences.end();
 
-
-
- 
-
-
   if (storedURL.length() == 0) {
     preferences.begin("fota", false);
     preferences.putString("url", "https://raw.githubusercontent.com/");
     preferences.end();
-    }
-
-
-
+  }
 }
 
 void loop() {
 
-mqtt.loop();
-unsigned long now = millis();
-unsigned long unahora;
+  mqtt.loop();
+  unsigned long now = millis();
+  unsigned long unahora;
+  static unsigned long lastNoDataMessage = 0;
+  static unsigned long last_10ms_event = 0;
+  static unsigned long last_100ms_event = 0;
+  static unsigned long last_1s_event = 0;
 
+  //Estructura principal de tiempo
+  if (now - last_1s_event >= 1000) {
+    last_1s_event = now;
 
+    leer_tension_adc1_ch7();
+  }
+  if (now - last_100ms_event >= 100) {
+    last_100ms_event = now;
 
+    //Lectura ADC
+    //leer_tension_adc2_0();
+  }
+  if (now - last_10ms_event >= 10) {
+    last_10ms_event = now;
+  }
 
-  
-
-
-// ---- VERIFICAR BOToN CONFIG ----
+  // ---- VERIFICAR BOToN CONFIG ----
   if ((digitalRead(AP_BUTTON_PIN) == LOW) || (ssid.length() == 0)) {
+
     if (!buttonWasPressed) {
       buttonPressStartTime = now;
       buttonWasPressed = true;
     } else if (now - buttonPressStartTime >= BUTTON_PRESS_TIME) {
-      Serial.println("Boton presionado 5 segundos. Entrando en modo configuracoon...");
+      Serial.println("Boton presionado 5 segundos. Entrando en modo configuracion...");
       mqtt.disconnect();
       WiFi.disconnect(true);  // Borra configuracion WiFi
       delay(500);
@@ -298,10 +280,9 @@ unsigned long unahora;
 
       // Bucle del modo AP
       while (true) {
-        
+
         server.handleClient();
         adminServer.handleClient();
-        
         digitalWrite(LED_PIN, !digitalRead(LED_PIN));
         delay(500);
         esp_task_wdt_reset();
@@ -312,226 +293,182 @@ unsigned long unahora;
   }
 
 
-  // ========== FASE GPS ==========  
+  // ========== FASE GPS ==========
   if (faseGPS) {
     Serial.println("Entrando a fase GPS bloqueante");
-    Serial.println("punto0");
     // Encendemos GPS si no esta encendido
-     enableGPS();
-Serial.println("punto0.1");
+    enableGPS();
     float lat, lon;
     unsigned long tiempoInicioBloqueo = now;
 
     bool fix_conseguido = false;
-    
-while (!fix_conseguido && millis() - tiempoInicioBloqueo < tiempoLimiteGPS) {
-  esp_task_wdt_reset();
-  Serial.println("punto1");
-  if (modem.getGPS(&lat, &lon)) {
-    fix_conseguido = true;
-    Serial.println("punto2");
-    String nuevaLat = String(lat, 6);
-    String nuevaLon = String(lon, 6);
-    setLocationValid(true);
 
-    setLatitude(nuevaLat);
-    setLongitude(nuevaLon);
-    ultimaLat = nuevaLat;
-    ultimaLon = nuevaLon;
+    while (!fix_conseguido && millis() - tiempoInicioBloqueo < tiempoLimiteGPS) {
 
-    Serial.println("GPS FIX conseguido:");
-    Serial.println("Latitud actual: " + ultimaLat);
-    Serial.println("Longitud actual: " + ultimaLon);
+      esp_task_wdt_reset();
+      if (modem.getGPS(&lat, &lon)) {
+        fix_conseguido = true;
+        String nuevaLat = String(lat, 6);
+        String nuevaLon = String(lon, 6);
+        setLocationValid(true);
 
-    guardar_en_flash("lat", nuevaLat);
-    guardar_en_flash("lon", nuevaLon);
-    esp_task_wdt_reset();
-  }
+        setLatitude(nuevaLat);
+        setLongitude(nuevaLon);
+        ultimaLat = nuevaLat;
+        ultimaLon = nuevaLon;
 
-  // Parpadeo LED sin delay bloqueante
-  static unsigned long lastBlink = 0;
-  if (millis() - lastBlink > 300) {
-    Serial.println("punto3");
-    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    lastBlink = millis();
-    esp_task_wdt_reset();
-  }
-  Serial.println("punto4");
-  esp_task_wdt_reset();
-  delay(10);  // pequeño delay para no saturar CPU
-}
-Serial.println("punto5");
+        Serial.println("GPS FIX conseguido:");
+        Serial.println("Latitud actual: " + ultimaLat);
+        Serial.println("Longitud actual: " + ultimaLon);
+
+        guardar_en_flash("lat", nuevaLat);
+        guardar_en_flash("lon", nuevaLon);
+        esp_task_wdt_reset();
+      }
+
+      // Parpadeo LED sin delay bloqueante
+      static unsigned long lastBlink = 0;
+      if (millis() - lastBlink > 300) {
+        digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        lastBlink = millis();
+        esp_task_wdt_reset();
+      }
+      esp_task_wdt_reset();
+      delay(10);  // pequeño delay para no saturar CPU
+    }
+
     // Apagamos GPS y reiniciamos modem antes de cambiar fase
     disableGPS();
     modemRestart();
 
-//---------------------------------------------------------------------//
-    
+    //---------------------------------------------------------------------//
 
     if (!modem.init()) {
-  Serial.println("Fallo en modem.init() luego de restart");
-  contadorErroresModem++;
-  Serial.print("Contador de errores de modem: ");
-  Serial.println(contadorErroresModem);
+      Serial.println("Fallo en modem.init() luego de restart");
+      contadorErroresModem++;
+      Serial.print("Contador de errores de modem: ");
+      Serial.println(contadorErroresModem);
 
-  if (contadorErroresModem >= limiteErroresModem) {
-    Serial.println("Se alcanzo el limite de errores. Reiniciando modem...");
-    modemRestart();        // Reinicio completo del modem
-    contadorErroresModem = 0;
-    delay(3000);
-    
-    if (!modem.init()) {
-      Serial.println("Fallo tras reinicio forzado del modem.");
-      // Si queres reiniciar toda la placa en este punto, podes hacer:
-       ESP.restart();
+      if (contadorErroresModem >= limiteErroresModem) {
+        Serial.println("Se alcanzo el limite de errores. Reiniciando modem...");
+        modemRestart();  // Reinicio completo del modem
+        contadorErroresModem = 0;
+        delay(3000);
+
+        if (!modem.init()) {
+          Serial.println("Fallo tras reinicio forzado del modem.");
+          // Si queres reiniciar toda la placa en este punto, podes hacer:
+          ESP.restart();
+        } else {
+          Serial.println("Modem recuperado.");
+          faseGPS = false;
+          faseGPRS_WIFI = true;
+          digitalWrite(LED_PIN, false);
+        }
+      }
     } else {
-      Serial.println("Modem recuperado.");
-      faseGPS = false;
-      faseGPRS_WIFI = true;
-      digitalWrite(LED_PIN, false);
-    }
-  }
-}else {
       Serial.println("Modem iniciado.");
       faseGPS = false;
       faseGPRS_WIFI = true;
       digitalWrite(LED_PIN, false);
-
-    
-  }
+    }
   }
 
-
-
-/*ACA SE FIJA SI ESTOY CONECTADO A WIFI O A RED CELULAR*/
+  /*ACA SE FIJA SI ESTOY CONECTADO A WIFI O A RED CELULAR*/
   static unsigned long lastCheck = 0;
-if (millis() - lastCheck > 10000) {  // cada 10 segundos
-  if (TINY_GSM_USE_WIFI && WiFi.status() == WL_CONNECTED) {
-    Serial.println("Conectado por WiFi");
-  } else if (TINY_GSM_USE_GPRS && modem.isNetworkConnected() && modem.isGprsConnected()) {
-    Serial.println("Conectado por GPRS");
-  } else {
-    Serial.println("No hay conexion activa");
+  if (millis() - lastCheck > 10000) {  // cada 10 segundos
+    if (TINY_GSM_USE_WIFI && WiFi.status() == WL_CONNECTED) {
+      Serial.println("Conectado por WiFi");
+    } else if (TINY_GSM_USE_GPRS && modem.isNetworkConnected() && modem.isGprsConnected()) {
+      Serial.println("Conectado por GPRS");
+    } else {
+      Serial.println("No hay conexion activa");
+    }
+    lastCheck = millis();
   }
-  lastCheck = millis();
-}
-
-  
 
   // ========== FASE GPRS/WIFI ==========
   if (faseGPRS_WIFI) {
 
+    if (now - unahora >= (60 * 1000 * 60)) {  //contador 1 hora
 
-  if (now - unahora >= (60*1000*60)) { //contador 1 hora
+      TINY_GSM_USE_WIFI = true;
+      TINY_GSM_USE_GPRS = false;
+    }
 
-    TINY_GSM_USE_WIFI = true;
-    TINY_GSM_USE_GPRS = false;
-    
-  }
+    if (TINY_GSM_USE_WIFI == true && TINY_GSM_USE_GPRS == false && WiFi.status() != WL_CONNECTED) {
+      mqtt.setClient(espClient);
+      conectar_WiFi();
 
-  if (TINY_GSM_USE_WIFI == true && TINY_GSM_USE_GPRS == false && WiFi.status() != WL_CONNECTED)
-{
-  mqtt.setClient(espClient);
-  conectar_WiFi();
-  
-  
-  
-}
-  else if (TINY_GSM_USE_WIFI == false && TINY_GSM_USE_GPRS == true)
-{
-  mqtt.setClient(gsmClient);
+    } else if (TINY_GSM_USE_WIFI == false && TINY_GSM_USE_GPRS == true) {
 
-  updateNetworkConnection(modem); // Conexion no bloqueante
+      mqtt.setClient(gsmClient);
+      updateNetworkConnection(modem);  // Conexion no bloqueante
 
-
-
-if (!modem.isGprsConnected()) {
-  Serial.println("Intentando conectar GPRS...");
-  if (modem.gprsConnect(apn, gprsUser, gprsPass)) {
-    Serial.println("GPRS conectado correctamente");
-    // MQTT Broker setup
-    mqtt.setServer(MQTT_BROKER.c_str(), 1883);
-    mqtt.setCallback(mqttCallback);
-  } else {
-    Serial.println("Fallo al conectar GPRS");
-  }
-}
-
-
-if (modem.isNetworkConnected() && modem.isGprsConnected()) {
-      
-    
-      if (!relojActualizado) {  
-        if (updateClockFromNTP(modem)) {
-    
-    relojActualizado = true;
-    ultimaActualizacionNTP = now;
-    // ... Utiliza la hora sincronizada ...
-  } else {
-    Serial.println("Fallo la actualizacion de NTP");
-  }
-      } else if (now - ultimaActualizacionNTP >= intervaloNTP) {
-        if (updateClockFromNTP(modem)) {
-          ultimaActualizacionNTP = now;
+      if (!modem.isGprsConnected()) {
+        Serial.println("Intentando conectar GPRS...");
+        if (modem.gprsConnect(apn, gprsUser, gprsPass)) {
+          Serial.println("GPRS conectado correctamente");
+          // MQTT Broker setup
+          mqtt.setServer(MQTT_BROKER.c_str(), 1883);
+          mqtt.setCallback(mqttCallback);
+        } else {
+          Serial.println("Fallo al conectar GPRS");
         }
       }
 
-    }
+      if (modem.isNetworkConnected() && modem.isGprsConnected()) {
 
-  
-}
-   
-}
+        if (!relojActualizado) {
+          if (updateClockFromNTP(modem)) {
 
-
-if (!mqtt.connected()) {
-      uint32_t t = millis();
-      if (t - lastReconnectAttempt > 10000) {
-        lastReconnectAttempt = t;
-        esp_task_wdt_reset();
-        mqttConnect();
-        esp_task_wdt_reset();
+            relojActualizado = true;
+            ultimaActualizacionNTP = now;
+            // ... Utiliza la hora sincronizada ...
+          } else {
+            Serial.println("Fallo la actualizacion de NTP");
+          }
+        } else if (now - ultimaActualizacionNTP >= intervaloNTP) {
+          if (updateClockFromNTP(modem)) {
+            ultimaActualizacionNTP = now;
+          }
+        }
       }
     }
+  }
 
 
+  if (!mqtt.connected()) {
+    uint32_t t = millis();
+    if (t - lastReconnectAttempt > 10000) {
+      lastReconnectAttempt = t;
+      esp_task_wdt_reset();
+      mqttConnect();
+      esp_task_wdt_reset();
+    }
+  }
 
-/*LOOP CADA 5 SEGUNDOS*/
+  /*LOOP CADA 5 SEGUNDOS*/
+  if (en_sensor) {
+    // ---- LECTURA SENSOR ----
+    if (now - last_Sensor_read > Sensor_read_Interval) {
+      last_Sensor_read = now;
+      float valor = sensor->readValue();  // Lee valor actual del sensor
+      valorStr = String(valor, 2);        // Guarda en string para el JSON
+      esp_task_wdt_reset();
+    }
 
+    /*DE ACa SALE LA LECTURA DEL SENSOR Y SU REINICIO SI SE TILDA*/
+    sensor->loop();
+  }
 
-
-
-if (en_sensor){  
-// ---- LECTURA SENSOR ----
-  if (now - last_Sensor_read > Sensor_read_Interval) {
-  last_Sensor_read = now;
-
-
-
-  float valor = sensor->readValue();  // Lee valor actual del sensor
-  valorStr = String(valor, 2);        // Guarda en string para el JSON
-
-
-
-  esp_task_wdt_reset();
-}
-
-
-/*DE ACa SALE LA LECTURA DEL SENSOR Y SU REINICIO SI SE TILDA*/
-
-
-  sensor->loop();
-}
-
-
- // ---- LECTURA DE FLASH ----
+  // ---- LECTURA DE FLASH ----
   if (now - last_flash_read > Packets_read_Interval) {
-    
+
     while (!flash_buffer_empty()) {
       const char* packet = flash_get_next_packet();
       esp_task_wdt_reset();
-      
-      
+
       if (packet == nullptr) break;
       last_flash_read = now;
       String packetStr = String(packet);
@@ -539,126 +476,131 @@ if (en_sensor){
         if (publish_mqtt_json(topic1, packetStr)) {
           flash_mark_packet_sent();
           mqttUltimaConexionOK = millis();  //  Reset tambien con datos del buffer
-          
+
         } else {
           break;
-          
         }
       }
-     break;
+      break;
     }
   }
 
-
-
-
-// ---- ENViO DATOS CADA INTERVALO ----  //
+  // ---- ENViO DATOS CADA INTERVALO ----  //
   if (now - lastPublish > publishInterval * 1000) {
-    
+
     lastPublish = now;
-    
-    if (WiFi.status() == WL_CONNECTED){
-    updateClockFromNTP_wifi();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      updateClockFromNTP_wifi();
     }
-    
+
     Serial.print("Dato sensor: ");
-Serial.println(valorStr);
+    Serial.println(valorStr);
 
-    
-
-unsigned long numPkt = obtener_y_avanzar_numero_paquete();    
-
-if (en_sensor==1){
-String jsonsensor = create_mqtt_json_sensor(
-  topic1, ident, valorStr, printCurrentTime(), ultimaLat, ultimaLon,
-  leer_tension_bateria(), leer_tension_principal(),
-  numPkt
-);
-
-if (mqtt.connected()) {
-
-      if (topic1.length() == 0 || jsonsensor.length() == 0) {
-        Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
-      } else {
-        if (publish_mqtt_json(topic1, jsonsensor)) {
-      mqttUltimaConexionOK = millis();  //  Reset al publicar con exito
-          }
-        }
-        
-    }else {
-      flash_save_packet(jsonsensor.c_str());
-      
-      
-      Serial.println(mqtt.connected());
-      
-      Serial.println(WiFi.status());
-    }
-
-
-}else if (en_serial==1){
-String jsonserial = create_mqtt_json_serial(
-  topic1, ident, sensorValues[0], sensorValues[1],sensorValues[2], sensorValues[3], sensorValues[4], sensorValues[5], sensorValues[6], sensorValues[7], sensorValues[8], sensorValues[9],sensorValues[10],
-  sensorValues[11], sensorValues[12], sensorValues[13], sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat, ultimaLon,
-  leer_tension_bateria(), leer_tension_principal(),
-  numPkt
-);
-
-if (mqtt.connected()) {
-
-      if (topic1.length() == 0 || jsonserial.length() == 0) {
-        Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
-      } else {
-        if (publish_mqtt_json(topic1, jsonserial)) {
-      mqttUltimaConexionOK = millis();  //  Reset al publicar con exito
-          }
-        }
-        
-    }else {
-      flash_save_packet(jsonserial.c_str());
-      
-      
-      Serial.println(mqtt.connected());
-      
-      Serial.println(WiFi.status());
-    }
-
-}
-
-else if (en_modbus==1) {
     unsigned long numPkt = obtener_y_avanzar_numero_paquete();
-    String jsonmodbus = create_mqtt_json_modbus(
-        topic1, ident, printCurrentTime(), ultimaLat, ultimaLon,
-        leer_tension_bateria(), leer_tension_principal(), numPkt
-    );
 
-    if (mqtt.connected()) {
-        if (topic1.length() == 0 || jsonmodbus.length() == 0) {
-            Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+    if (en_sensor == 1) {
+      Serial.print("Sensor habilitado. Enviando dato por MQTT...");
+      String jsonsensor = create_mqtt_json_sensor(
+        topic1, ident, valorStr, printCurrentTime(), ultimaLat, ultimaLon,
+        leer_tension_bateria(), leer_tension_principal(),
+        numPkt);
+
+      if (mqtt.connected()) {
+
+        if (topic1.length() == 0 || jsonsensor.length() == 0) {
+          Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
-            if (publish_mqtt_json(topic1, jsonmodbus)) {
-                mqttUltimaConexionOK = millis();
-            }
+          if (publish_mqtt_json(topic1, jsonsensor)) {
+            mqttUltimaConexionOK = millis();  //  Reset al publicar con exito
+          }
         }
-    } else {
+
+      } else {
+        flash_save_packet(jsonsensor.c_str());
+
+
+        Serial.println(mqtt.connected());
+
+        Serial.println(WiFi.status());
+      }
+
+
+    } else if (en_serial == 1) {
+
+      Serial.print("Serial habilitado. Enviando dato por MQTT...");
+
+      String jsonserial = create_mqtt_json_serial(
+        topic1, ident, sensorValues[0], sensorValues[1], sensorValues[2], sensorValues[3], sensorValues[4], sensorValues[5], sensorValues[6], sensorValues[7], sensorValues[8], sensorValues[9], sensorValues[10],
+        sensorValues[11], sensorValues[12], sensorValues[13], sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat, ultimaLon,
+        leer_tension_bateria(), leer_tension_principal(),
+        numPkt);
+
+      if (mqtt.connected()) {
+
+        if (topic1.length() == 0 || jsonserial.length() == 0) {
+          Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+        } else {
+          if (publish_mqtt_json(topic1, jsonserial)) {
+            mqttUltimaConexionOK = millis();  //  Reset al publicar con exito
+          }
+        }
+
+      } else {
+
+        flash_save_packet(jsonserial.c_str());
+        Serial.println(mqtt.connected());
+        Serial.println(WiFi.status());
+      }
+
+    } else if (en_modbus == 1) {
+
+      Serial.print("Modbus habilitado. Enviando dato por MQTT...");
+
+      unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+      String jsonmodbus = create_mqtt_json_modbus(
+        topic1, ident, printCurrentTime(), ultimaLat, ultimaLon,
+        leer_tension_bateria(), leer_tension_principal(), numPkt);
+
+      if (mqtt.connected()) {
+        if (topic1.length() == 0 || jsonmodbus.length() == 0) {
+          Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+        } else {
+          if (publish_mqtt_json(topic1, jsonmodbus)) {
+            mqttUltimaConexionOK = millis();
+          }
+        }
+      } else {
         flash_save_packet(jsonmodbus.c_str());
+      }
     }
-}
 
     esp_task_wdt_reset();
   }
 
+  //Keep Alive si no hay datos para transmitir
+  if (en_sensor != 1 && en_serial != 1 && en_modbus != 1) {
 
+    if (now - lastNoDataMessage > 5000) {
 
-if (mqttActivo && millis() - mqttUltimaConexionOK > MQTT_TIMEOUT) {
-  Serial.println("🕒 Tiempo sin reconexion MQTT superado. Reiniciando...");
-  delay(1000);
-  ESP.restart();
-}
+      String jsonKeepAlive = create_mqtt_json_keepalive(ident, printCurrentTime(), versionado);
 
+      if (mqtt.connected()) {
+        publish_mqtt_json(topic1, jsonKeepAlive);
+      }
 
+      lastNoDataMessage = now;
+    }
+  }
+
+  if (mqttActivo && millis() - mqttUltimaConexionOK > MQTT_TIMEOUT) {
+    Serial.println("🕒 Tiempo sin reconexion MQTT superado. Reiniciando...");
+    delay(1000);
+    ESP.restart();
+  }
 
   // ---- OTRAS FUNCIONES ----
-  
+
   escucharComandos();
 
   // Solo leo SerialSecundario si está habilitado EN_SERIAL
@@ -673,13 +615,7 @@ if (mqttActivo && millis() - mqttUltimaConexionOK > MQTT_TIMEOUT) {
 
   actualizarLED();
   esp_task_wdt_reset();  // Alimenta el WDT
-  
-  }
-
-
-
-
-
+}
 
 
 void actualizarLED() {
@@ -695,7 +631,7 @@ void actualizarLED() {
   }
 
   // Conectado a WiFi o GPRS pero sin conexion MQTT → doble parpadeo rapido cada 2 segundos
-  if (((WiFi.status() == WL_CONNECTED)|| (modem.isGprsConnected())) && !mqtt.connected()) {
+  if (((WiFi.status() == WL_CONNECTED) || (modem.isGprsConnected())) && !mqtt.connected()) {
     static int blinkCount = 0;
     static unsigned long blinkStart = 0;
 
@@ -718,32 +654,14 @@ void actualizarLED() {
   digitalWrite(LED_PIN, LOW);
 }
 
-
-
-
-
-
-
 unsigned long obtener_y_avanzar_numero_paquete() {
   unsigned long actual = numeroPaquete;
   numeroPaquete++;
   if (numeroPaquete >= 7000) numeroPaquete = 0;
   return actual;
-} 
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-  void conectar_WiFi(){
+void conectar_WiFi() {
 
   Serial.println("Intentando conectar a WiFi guardada...");
   WiFi.mode(WIFI_STA);
@@ -767,5 +685,4 @@ unsigned long obtener_y_avanzar_numero_paquete() {
     TINY_GSM_USE_WIFI = false;
     TINY_GSM_USE_GPRS = true;
   }
-  }
-  
+}

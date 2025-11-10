@@ -5,9 +5,6 @@
 
 #include <TinyGsmClient.h>
 
-
-
-
 bool setupGPS(TinyGsm &modem);
 String getFormattedDateTime();
 void setLatitude(const String &lat);
@@ -18,4 +15,5 @@ String getLongitude();
 bool isLocationValid();
 void disableGPS(void);
 void enableGPS(void);
+
 #endif
