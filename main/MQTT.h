@@ -32,4 +32,6 @@ String create_mqtt_json_modbus(String topic, String ident,
                                float Vbateria, float Vprincipal,
                                unsigned long numeroPaquete);
 
+String create_mqtt_json_keepalive(String ident, String fechayhora, String versionado, unsigned long rebootCount);
+
 #endif

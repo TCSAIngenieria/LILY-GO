@@ -5,13 +5,10 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 
-
-
 extern WebServer server;
-extern WebServer adminServer;;
+extern WebServer adminServer;
 extern String ssid;
 extern String password;
-
 
 void handleRoot();
 void handleSave();

@@ -8,9 +8,9 @@ void updateClockFromNTP_wifi() {
   const char* ntpServer = "pool.ntp.org";
   //const long  gmtOffset_sec = -10800;  // Argentina = UTC -3
 
-  const long  gmtOffset_sec = 0;  // UTC 0
+  const long gmtOffset_sec = 0;  // UTC 0
 
-  const int   daylightOffset_sec = 0;
+  const int daylightOffset_sec = 0;
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
@@ -19,8 +19,8 @@ void updateClockFromNTP_wifi() {
   const int maxIntentos = 30;  // 30 * 200ms = 6 segundos max
 
   while (!getLocalTime(&timeinfo) && intentos < maxIntentos) {
-    delay(10);                 // esperar un poco entre intentos
-    esp_task_wdt_reset();       // mantener vivo el watchdog
+    delay(10);             // esperar un poco entre intentos
+    esp_task_wdt_reset();  // mantener vivo el watchdog
     intentos++;
   }
 
@@ -37,9 +37,6 @@ void updateClockFromNTP_wifi() {
   Serial.println(ctime(&now));
   esp_task_wdt_reset();  // por las dudas, una mas
 }
-
-
-
 
 String printCurrentTime() {
   struct tm timeinfo;

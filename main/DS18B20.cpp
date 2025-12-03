@@ -1,7 +1,8 @@
 #include "DS18B20.h"
 #include <Arduino.h>
 
-DS18B20::DS18B20() : oneWire(ONE_WIRE_BUS), sensors(&oneWire) {}
+DS18B20::DS18B20()
+  : oneWire(ONE_WIRE_BUS), sensors(&oneWire) {}
 
 void DS18B20::begin() {
   pinMode(SENSOR_POWER_PIN, OUTPUT);
@@ -11,8 +12,7 @@ void DS18B20::begin() {
 }
 
 void DS18B20::initSensor() {
-  
-  
+
   sensors.begin();
   if (!sensors.getAddress(address, 0)) {
     Serial.println(" No se encontro el sensor DS18B20.");
@@ -55,8 +55,7 @@ void DS18B20::loop() {
 
   switch (estadoReinicio) {
     case IDLE:
-      if ((now - tiempoUltimoCambio > SENSOR_TIEMPO_MAX_IGUAL) ||
-          ultimaTempValida == -127.0 || ultimaTempValida == -999.0) {
+      if ((now - tiempoUltimoCambio > SENSOR_TIEMPO_MAX_IGUAL) || ultimaTempValida == -127.0 || ultimaTempValida == -999.0) {
         Serial.println("🔁 Reiniciando sensor DS18B20...");
         digitalWrite(SENSOR_POWER_PIN, LOW);
         tiempoReinicio = now;
@@ -73,12 +72,12 @@ void DS18B20::loop() {
       break;
 
     case ENCENDIDO:
-  if (now - tiempoReinicio > 500) {
-    Serial.println(" Sonda DS18B20 reiniciada.");
-    tiempoUltimoCambio = now;
-    initSensor();  
-    estadoReinicio = IDLE;
-  }
-  break;
+      if (now - tiempoReinicio > 500) {
+        Serial.println(" Sonda DS18B20 reiniciada.");
+        tiempoUltimoCambio = now;
+        initSensor();
+        estadoReinicio = IDLE;
+      }
+      break;
   }
 }

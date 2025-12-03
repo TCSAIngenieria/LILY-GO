@@ -9,29 +9,27 @@
 bool isModemReady = false;
 bool isModemConnected = false;
 unsigned long lastConnectAttempt = 0;
-const unsigned long connectInterval = 10000; // 10 segundos
+const unsigned long connectInterval = 10000;  // 10 segundos
 int currentModeIndex = 0;
-uint8_t networkModes[] = {38, 39, 13}; // CAT-M1, NB-IoT, GPRS
+uint8_t networkModes[] = { 38, 39, 13 };  // CAT-M1, NB-IoT, GPRS
 
 static time_t internalTime = 0;
 
 
 #define SerialAT Serial1
 
-void modemPowerOn()
-{
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, HIGH);
-    delay(1000);    //Datasheet Ton mintues = 1S
-    digitalWrite(PWR_PIN, LOW);
+void modemPowerOn() {
+  pinMode(PWR_PIN, OUTPUT);
+  digitalWrite(PWR_PIN, HIGH);
+  delay(1000);  //Datasheet Ton mintues = 1S
+  digitalWrite(PWR_PIN, LOW);
 }
 
-void modemPowerOff()
-{
-    pinMode(PWR_PIN, OUTPUT);
-    digitalWrite(PWR_PIN, HIGH);
-    delay(1500);    //Datasheet Ton mintues = 1.2S
-    digitalWrite(PWR_PIN, LOW);
+void modemPowerOff() {
+  pinMode(PWR_PIN, OUTPUT);
+  digitalWrite(PWR_PIN, HIGH);
+  delay(1500);  //Datasheet Ton mintues = 1.2S
+  digitalWrite(PWR_PIN, LOW);
 }
 
 void modemRestart() {
@@ -53,7 +51,7 @@ void initSD() {
 }
 
 void printModemInfo(TinyGsm &modem, String &res) {
-  
+
   //"========SIMCOMATI======"
   modem.sendAT("+SIMCOMATI");
   modem.waitResponse(1000L, res);
@@ -66,7 +64,7 @@ void printModemInfo(TinyGsm &modem, String &res) {
     Serial.println(res);
   }
   res = "";
-  
+
   //=====Preferred selection between CAT-M and NB-IoT====="
   modem.sendAT("+CMNB?");
   if (modem.waitResponse(1000L, res) == 1) {
@@ -80,13 +78,7 @@ void printModemInfo(TinyGsm &modem, String &res) {
     Serial.println(res);
   }
   res = "";
-
 }
-
-
-
-
-
 
 bool updateClockFromNTP(TinyGsm &modem) {
   String res;
@@ -96,16 +88,16 @@ bool updateClockFromNTP(TinyGsm &modem) {
     Serial.println(res);
   }
   res = "";
-    
-  delay(2000); // Espera para que la hora se actualice en el modem
+
+  delay(2000);  // Espera para que la hora se actualice en el modem
 
   Serial.println("[NTP] Leyendo hora desde el modem...");
   modem.sendAT("+CCLK?");
-  
+
   if (modem.waitResponse(1000L, res) == 1) {
     Serial.println(res);
   }
-  
+
   int index = res.indexOf("+CCLK:");
   if (index != -1) {
     int start = res.indexOf("\"", index);
@@ -118,11 +110,11 @@ bool updateClockFromNTP(TinyGsm &modem) {
       res = "";
       return true;
     }
-  }else{
+  } else {
 
-  Serial.println("[NTP] No se pudo parsear la hora del modem");
-  return false;
-}
+    Serial.println("[NTP] No se pudo parsear la hora del modem");
+    return false;
+  }
 }
 String currentTime = "00/00/00,00:00:00+00";  // formato del modem
 
@@ -134,11 +126,11 @@ void updateInternalClock(String clockString) {
   int yy, MM, dd, hh, mm, ss;
   if (sscanf(clockString.c_str(), "\"%2d/%2d/%2d,%2d:%2d:%2d", &yy, &MM, &dd, &hh, &mm, &ss) == 6) {
     tm.tm_year = 2000 + yy - 1900;  // Año desde 1900
-    tm.tm_mon  = MM - 1;            // Mes 0-11
+    tm.tm_mon = MM - 1;             // Mes 0-11
     tm.tm_mday = dd;
     tm.tm_hour = hh;
-    tm.tm_min  = mm;
-    tm.tm_sec  = ss;
+    tm.tm_min = mm;
+    tm.tm_sec = ss;
 
     time_t t = mktime(&tm);
     struct timeval now = { .tv_sec = t };
@@ -151,13 +143,9 @@ void updateInternalClock(String clockString) {
   }
 }
 
-
-
-
-
 void updateNetworkConnection(TinyGsm &modem) {
- 
-//Inicializo el modem
+
+  //Inicializo el modem
 
   if (!isModemReady) {
     isModemReady = modem.init();
@@ -166,7 +154,6 @@ void updateNetworkConnection(TinyGsm &modem) {
       return;
     }
   }
-
 
   if (strlen(GSM_PIN) > 0 && modem.getSimStatus() != 3) {
     modem.simUnlock(GSM_PIN);
@@ -187,8 +174,8 @@ void updateNetworkConnection(TinyGsm &modem) {
   Serial.println(isModemConnected ? "SI" : "NO");
 
   if (!isModemConnected) {
-    currentModeIndex = (currentModeIndex + 1) % 3; // Cambia al siguiente modo
+    currentModeIndex = (currentModeIndex + 1) % 3;  // Cambia al siguiente modo
   } else {
-    digitalWrite(LED_PIN, HIGH); // LED ON si conecta
+    digitalWrite(LED_PIN, HIGH);  // LED ON si conecta
   }
 }

@@ -30,4 +30,4 @@ const char* flash_get_next_packet();
 // Marca el paquete enviado para avanzar el puntero
 void flash_mark_packet_sent();
 
-#endif 
+#endif

@@ -10,8 +10,8 @@ extern Preferences preferences;
 WebServer server(80);         //web server
 WebServer adminServer(8080);  //web server admin
 
-String ssid= "";
-String password= "";
+String ssid = "";
+String password = "";
 bool wifiConfigurado = false;
 
 extern SensorInterface* sensor;
@@ -152,12 +152,6 @@ void handleRoot() {
   server.send(200, "text/html", page);
 }
 
-
-
-
-
-
-
 void handleSave() {
   if (server.hasArg("ssid") && server.hasArg("password")) {
     ssid = server.arg("ssid");
@@ -169,11 +163,11 @@ void handleSave() {
     preferences.end();
 
     server.send(200, "text/html", "<h1>Guardado! Intentando conectar...</h1>");
-    
+
     delay(2000);
     // Apagar modo AP
     WiFi.softAPdisconnect(true);
-    
+
     // Intentar conectar
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -196,8 +190,6 @@ void handleSave() {
   }
 }
 
-
-
 void iniciarModoConfiguracion() {
   Serial.println("Modo configuracion: arranca AP");
   WiFi.mode(WIFI_AP);
@@ -213,24 +205,17 @@ void iniciarModoConfiguracion() {
   } else {
     Serial.println("Error iniciando mDNS");
   }
-  
+
 
   server.on("/", handleRoot);
   server.on("/save", HTTP_POST, handleSave);
   server.begin();
 }
 
-
-
 /*____________________________________________________________________________________________________________*/
 
 
-
-
-
 /*--------------------------------WEB SERVER ADMIN-----------------------------------*/
-
-
 
 void handleRootPrivado() {
   preferences.begin("mqtt", true);
@@ -275,8 +260,10 @@ void handleRootPrivado() {
 <body>
   <h1>Configuracion MQTT</h1>
   <form action="/save" method="POST">
-    IP Broker: <input type="text" name="ip" value=")rawliteral" + ip + R"rawliteral("><br>
-    Puerto: <input type="number" name="port" value=")rawliteral" + String(port) + R"rawliteral("><br>
+    IP Broker: <input type="text" name="ip" value=")rawliteral"
+                + ip + R"rawliteral("><br>
+    Puerto: <input type="number" name="port" value=")rawliteral"
+                + String(port) + R"rawliteral("><br>
     <input type="submit" value="Guardar">
   </form>
 
@@ -289,8 +276,6 @@ void handleRootPrivado() {
 
   adminServer.send(200, "text/html", page);
 }
-
-
 
 void handleSavePrivado() {
   if (adminServer.hasArg("ip") && adminServer.hasArg("port")) {
