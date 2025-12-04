@@ -19,6 +19,7 @@ String sensorValues[16]; // S0...S15
 extern HardwareSerial SensorSerial;
 extern HardwareSerial SensorSerial;
 extern float filterADC[3][2];
+extern float paramADC[3][2];
 extern int cantMed;
 
 uint en_sensor;
@@ -65,6 +66,37 @@ String procesarComando(String comando) {
         preferences.end();
 
         respuesta = "FILTRO SETEADO OK";
+      } else {
+        respuesta = "ERROR: Indice fuera de rango (0-2)";
+      }
+    } else {
+      respuesta = "ERROR: Formato incorrecto (n,m,p)";
+    }
+
+    /* COMANDO FACTOR ADC */
+  } else if (comando.startsWith("DVL+SFACTOR=")) {
+    // Formato: DVL+SFACTOR=n,m,p
+    String args = comando.substring(12);
+    int firstComma = args.indexOf(',');
+    int secondComma = args.indexOf(',', firstComma + 1);
+
+    if (firstComma > 0 && secondComma > firstComma) {
+      int n = args.substring(0, firstComma).toInt();
+      float m = args.substring(firstComma + 1, secondComma).toFloat();
+      float p = args.substring(secondComma + 1).toFloat();
+
+      if (n >= 0 && n < 3) {
+        paramADC[n][0] = m;
+        paramADC[n][1] = p;
+
+        preferences.begin("adc_config", false);
+        String keyFactor = "param_" + String(n) + "_0";
+        String keyOffset = "param_" + String(n) + "_1";
+        preferences.putFloat(keyFactor.c_str(), m);
+        preferences.putFloat(keyOffset.c_str(), p);
+        preferences.end();
+
+        respuesta = "FACTOR SETEADO OK";
       } else {
         respuesta = "ERROR: Indice fuera de rango (0-2)";
       }
@@ -234,6 +266,12 @@ String procesarComando(String comando) {
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
         " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]) +
         " | FIL2=" + String(filterADC[2][0]) + "," + String(filterADC[2][1]);
+
+  } else if (comando == "DVL+QFACTOR") {
+    respuesta =
+        "FAC0=" + String(paramADC[0][0]) + "," + String(paramADC[0][1]) +
+        " | FAC1=" + String(paramADC[1][0]) + "," + String(paramADC[1][1]) +
+        " | FAC2=" + String(paramADC[2][0]) + "," + String(paramADC[2][1]);
 
   } else if (comando.startsWith("DVL+SALI=")) {
     int val = comando.substring(9).toInt();

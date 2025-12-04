@@ -35,6 +35,12 @@ void initADC() {
     String keyVal = "fil_" + String(i) + "_1";
     filterADC[i][0] = preferences.getFloat(keyMin.c_str(), filterADC[i][0]);
     filterADC[i][1] = preferences.getFloat(keyVal.c_str(), filterADC[i][1]);
+
+    // Cargar paramADC (Factor y Offset)
+    String keyFactor = "param_" + String(i) + "_0";
+    String keyOffset = "param_" + String(i) + "_1";
+    paramADC[i][0] = preferences.getFloat(keyFactor.c_str(), paramADC[i][0]);
+    paramADC[i][1] = preferences.getFloat(keyOffset.c_str(), paramADC[i][1]);
   }
   cantMed = preferences.getInt("cantMed", 50);
   preferences.end();
