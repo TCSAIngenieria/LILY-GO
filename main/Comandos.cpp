@@ -17,7 +17,9 @@ char separator = ',';
 String sensorValues[16]; // S0...S15
 
 extern HardwareSerial SensorSerial;
+extern HardwareSerial SensorSerial;
 extern float filterADC[3][2];
+extern int cantMed;
 
 uint en_sensor;
 uint en_serial;
@@ -232,6 +234,22 @@ String procesarComando(String comando) {
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
         " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]) +
         " | FIL2=" + String(filterADC[2][0]) + "," + String(filterADC[2][1]);
+
+  } else if (comando.startsWith("DVL+SALI=")) {
+    int val = comando.substring(9).toInt();
+    if (val > 0) {
+      cantMed = val;
+      preferences.begin("adc_config", false);
+      preferences.putInt("cantMed", cantMed);
+      preferences.end();
+      respuesta = "CANT_MED SETEADO OK";
+    } else {
+      respuesta = "ERROR: Valor debe ser mayor a 0";
+    }
+
+  } else if (comando == "DVL+QALI") {
+    respuesta = "CANT_MED=" + String(cantMed);
+
   } else if (comando == "DVL+RESET") {
     respuesta = ">> Reiniciando dispositivo...";
     Serial.println(respuesta); // Lo mostramos antes del reset

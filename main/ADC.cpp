@@ -36,6 +36,7 @@ void initADC() {
     filterADC[i][0] = preferences.getFloat(keyMin.c_str(), filterADC[i][0]);
     filterADC[i][1] = preferences.getFloat(keyVal.c_str(), filterADC[i][1]);
   }
+  cantMed = preferences.getInt("cantMed", 50);
   preferences.end();
 }
 
