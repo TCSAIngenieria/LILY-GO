@@ -1,10 +1,11 @@
 #include "MQTT.h"
-#include <ArduinoJson.h>
-#include <Preferences.h>
 #include "Comandos.h"
 #include "FOTA.h"
 #include "Modbus.h"
 #include "esp_task_wdt.h"
+#include <ArduinoJson.h>
+#include <Preferences.h>
+
 
 #define LED_PIN 12
 const char *topicInit = "LilyGo/topicInit";
@@ -23,10 +24,8 @@ extern unsigned long mqttUltimaConexionOK;
 
 extern String modbus_lastValues[MODBUS_MAX_FRAMES];
 
-
-String MQTT_BROKER = "192.168.7.252";  // Valor por defecto
-int MQTT_PORT = 7183;                  // Valor por defecto
-
+String MQTT_BROKER = "192.168.7.252"; // Valor por defecto
+int MQTT_PORT = 7183;                 // Valor por defecto
 
 boolean mqttConnect() {
   Serial.print("Conectando a MQTT broker: ");
@@ -110,12 +109,15 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
   Serial.print(topic);
   Serial.print(": ");
   Serial.println(sent ? "OK" : "FALLo");
-  Serial.println(jsonPayload);  // Para debug: imprime el JSON publicado
+  Serial.println(jsonPayload); // Para debug: imprime el JSON publicado
 
   return sent;
 }
 
-String create_mqtt_json_sensor(String topic, String ident, String valor_variable, String fechayhora, String latitud, String longitud, float Vbateria, float Vprincipal, unsigned long numeroPaquete) {
+String create_mqtt_json_sensor(String topic, String ident,
+                               String valor_variable, String fechayhora,
+                               String latitud, String longitud, float Vbateria,
+                               float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<256> doc;
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
@@ -132,8 +134,13 @@ String create_mqtt_json_sensor(String topic, String ident, String valor_variable
   return String(payload);
 }
 
-String create_mqtt_json_serial(String topic, String ident, String S0, String S1, String S2, String S3, String S4, String S5,
-                               String S6, String S7, String S8, String S9, String S10, String S11, String S12, String S13, String S14, String S15, String fechayhora, String latitud, String longitud, float Vbateria, float Vprincipal, unsigned long numeroPaquete) {
+String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
+                               String S2, String S3, String S4, String S5,
+                               String S6, String S7, String S8, String S9,
+                               String S10, String S11, String S12, String S13,
+                               String S14, String S15, String fechayhora,
+                               String latitud, String longitud, float Vbateria,
+                               float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
   doc["ident"] = ident;
   doc["S0"] = S0;
@@ -165,11 +172,9 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
   return String(payload);
 }
 
-
-String create_mqtt_json_modbus(String topic, String ident,
-                               String fechayhora, String latitud, String longitud,
-                               float Vbateria, float Vprincipal,
-                               unsigned long numeroPaquete) {
+String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
+                               String latitud, String longitud, float Vbateria,
+                               float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
   doc["ident"] = ident;
 
@@ -194,7 +199,24 @@ String create_mqtt_json_modbus(String topic, String ident,
   return String(payload);
 }
 
-String create_mqtt_json_keepalive(String ident, String fechayhora, String versionado, unsigned long rebootCount) {
+String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
+                            float adc1, float adc2) {
+  StaticJsonDocument<256> doc;
+  doc["ident"] = ident;
+  doc["status"] = "adc-values";
+  doc["date"] = fechayhora;
+  doc["adc0"] = adc0;
+  doc["adc1"] = adc1;
+  doc["adc2"] = adc2;
+
+  char payload[256];
+  serializeJson(doc, payload);
+  return String(payload);
+}
+
+String create_mqtt_json_keepalive(String ident, String fechayhora,
+                                  String versionado,
+                                  unsigned long rebootCount) {
   StaticJsonDocument<128> doc;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";

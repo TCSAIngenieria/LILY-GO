@@ -280,13 +280,13 @@ String procesarComando(String comando) {
       preferences.begin("adc_config", false);
       preferences.putInt("cantMed", cantMed);
       preferences.end();
-      respuesta = "CANT_MED SETEADO OK";
+      respuesta = "ALISADO SETEADO OK";
     } else {
       respuesta = "ERROR: Valor debe ser mayor a 0";
     }
 
   } else if (comando == "DVL+QALI") {
-    respuesta = "CANT_MED=" + String(cantMed);
+    respuesta = "ALISADO=" + String(cantMed);
 
   } else if (comando == "DVL+RESET") {
     respuesta = ">> Reiniciando dispositivo...";

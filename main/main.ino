@@ -47,7 +47,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V01.04.05";
+String versionado = "V01.05.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -126,7 +126,7 @@ bool buttonWasPressed = false;
 
 /* Sensor */
 SensorInterface *sensor;
-;
+
 unsigned long last_Sensor_read = 0;
 const unsigned long Sensor_read_Interval =
     5000; // intervalo de lectura de sensor //5 segundos por default
@@ -138,7 +138,7 @@ unsigned long last_flash_read = 0;
 
 /*Variables para ADC*/
 float ADCValue[3];
-float filterADC[3][2] = {{0, 100}, {0, 100}, {0, 100}};
+float filterADC[3][2] = {{0, 0}, {0, 0}, {0, 0}};
 float ADCValueAnt[3] = {0, 0, 0};
 int cantMed = 50;
 float paramADC[3][2] = {{1, 0}, {1, 0}, {1, 0}};
@@ -270,12 +270,6 @@ void loop() {
   // Estructura principal de tiempo
   if (now - last_1s_event >= 1000) {
     last_1s_event = now;
-    for (int i = 0; i < 3; i++) {
-      Serial.print("ADC ");
-      Serial.print(i);
-      Serial.print(" : ");
-      Serial.println(ADCValue[i]);
-    }
   }
 
   if (now - last_100ms_event >= 100) {
@@ -600,6 +594,20 @@ void loop() {
       } else {
         flash_save_packet(jsonmodbus.c_str());
       }
+    } else {
+      // Si no hay ningun sensor habilitado, enviamos reporte ADC
+      Serial.print("Ningun sensor habilitado. Enviando reporte ADC...");
+      String jsonadc = create_mqtt_json_adc(
+          ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
+
+      String topicADC = topic1 + "/ADC";
+      if (mqtt.connected()) {
+        if (publish_mqtt_json(topicADC, jsonadc)) {
+          mqttUltimaConexionOK = millis();
+        }
+      } else {
+        flash_save_packet(jsonadc.c_str());
+      }
     }
 
     esp_task_wdt_reset();
@@ -642,20 +650,21 @@ void loop() {
 void actualizarLED() {
   unsigned long now = millis();
 
-  // Si esta en modo configuracion (AP) → no tocamos nada (ya se maneja en loop
-  // del AP)
+  // Si esta en modo configuracion (AP) → no tocamos nada (ya se maneja en
+  // loop del AP)
   if (!wifiConfigurado &&
       (ssid.length() == 0 || digitalRead(AP_BUTTON_PIN) == LOW))
     return;
 
-  // MQTT activo y dentro de los 5 minutos desde la ultima conexion → LED fijo
+  // MQTT activo y dentro de los 5 minutos desde la ultima conexion → LED
+  // fijo
   if (mqttActivo && (now - mqttUltimaConexionOK <= MQTT_TIMEOUT)) {
     digitalWrite(LED_PIN, HIGH);
     return;
   }
 
-  // Conectado a WiFi o GPRS pero sin conexion MQTT → doble parpadeo rapido cada
-  // 2 segundos
+  // Conectado a WiFi o GPRS pero sin conexion MQTT → doble parpadeo rapido
+  // cada 2 segundos
   if (((WiFi.status() == WL_CONNECTED) || (modem.isGprsConnected())) &&
       !mqtt.connected()) {
     static int blinkCount = 0;
