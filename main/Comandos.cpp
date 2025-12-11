@@ -21,6 +21,7 @@ extern HardwareSerial SensorSerial;
 extern float filterADC[3][2];
 extern float paramADC[3][2];
 extern int cantMed;
+extern uint16_t tADC;
 
 uint en_sensor;
 uint en_serial;
@@ -284,6 +285,22 @@ String procesarComando(String comando) {
     } else {
       respuesta = "ERROR: Valor debe ser mayor a 0";
     }
+
+    /* COMANDO TIME ADC */
+  } else if (comando.startsWith("DVL+STADC=")) {
+    int val = comando.substring(10).toInt();
+    if (val >= 1 && val <= 65000) {
+      tADC = (uint16_t)val;
+      preferences.begin("adc_config", false);
+      preferences.putInt("tADC", tADC);
+      preferences.end();
+      respuesta = "TIME ADC SETEADO OK";
+    } else {
+      respuesta = "ERROR: Valor fuera de rango (1-65000)";
+    }
+
+  } else if (comando == "DVL+QTADC") {
+    respuesta = "TIME ADC=" + String(tADC);
 
   } else if (comando == "DVL+QALI") {
     respuesta = "ALISADO=" + String(cantMed);

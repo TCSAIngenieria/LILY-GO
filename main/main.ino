@@ -47,7 +47,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V01.05.01";
+String versionado = "V01.06.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -142,6 +142,8 @@ float filterADC[3][2] = {{0, 0}, {0, 0}, {0, 0}};
 float ADCValueAnt[3] = {0, 0, 0};
 int cantMed = 50;
 float paramADC[3][2] = {{1, 0}, {1, 0}, {1, 0}};
+uint16_t tADC = 1;
+uint16_t cADC = 0;
 
 void setup() {
   SerialMon.begin(115200); // puerto serial primario
@@ -166,6 +168,12 @@ void setup() {
   preferences.putULong("reboot", rebootCount);
   preferences.end();
   // ----------------------
+
+  preferences.begin("adc_config", true);
+  tADC = (uint16_t)preferences.getInt("tADC", 1);
+  if (tADC == 0)
+    tADC = 1; // Safety check
+  preferences.end();
 
   if (en_modbus) {
     modbus_set_enabled(true);
@@ -274,7 +282,10 @@ void loop() {
 
   if (now - last_100ms_event >= 100) {
     last_100ms_event = now;
-    procesarADC(ADCValue);
+    if (++cADC >= tADC) {
+      procesarADC(ADCValue);
+      cADC = 0;
+    }
   }
 
   if (now - last_10ms_event >= 10) {
