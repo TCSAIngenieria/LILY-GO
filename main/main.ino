@@ -16,6 +16,7 @@
 #include <WiFi.h>
 
 #include "ADC.h"
+#include "BLE_MOKO.h"
 #include "Comandos.h"
 #include "DS18B20.h"
 #include "FOTA.h"
@@ -47,7 +48,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V01.06.01";
+String versionado = "V02.01.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -69,6 +70,7 @@ unsigned long rebootCount = 0;
 extern uint en_sensor;
 extern uint en_serial;
 extern uint en_modbus;
+extern uint en_ble;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -126,6 +128,7 @@ bool buttonWasPressed = false;
 
 /* Sensor */
 SensorInterface *sensor;
+BLEMokoScanner bleScanner;
 
 unsigned long last_Sensor_read = 0;
 const unsigned long Sensor_read_Interval =
@@ -159,6 +162,7 @@ void setup() {
   en_sensor = preferences.getUInt("sensor", 0);
   en_serial = preferences.getUInt("serial", 0);
   en_modbus = preferences.getUInt("modbus", 0);
+  en_ble = preferences.getUInt("ble", 0);
   preferences.end();
 
   // --- Contador de reinicios ---
@@ -183,6 +187,10 @@ void setup() {
   if (en_serial) {
     pinMode(SENSOR_POWER_PIN, OUTPUT);
     digitalWrite(SENSOR_POWER_PIN, HIGH); // La expansora arranca encendida
+  }
+
+  if (en_ble) {
+    bleScanner.begin();
   }
 
   /*ACA TENGO QUE PONER EL SENSOR QUE VOY A UTILIZAR*/
@@ -238,6 +246,8 @@ void setup() {
   preferences.begin("wifi", true);
   ssid = preferences.getString("ssid", "Flash-PaPeR");
   password = preferences.getString("password", "Ayanami84");
+  // ssid = preferences.getString("ssid", "Invitados");
+  // password = preferences.getString("password", "TCinvitados");
   preferences.end();
 
   if (ssid.length() > 0) {
@@ -479,6 +489,38 @@ void loop() {
     }
   }
 
+  if (en_ble) {
+    bleScanner.loop();
+
+    if (bleScanner.hasNewData()) {
+      Serial.println("Detectados nuevos datos BLE, preparando envio MQTT...");
+      MokoSensorData bleData = bleScanner.getLatestData();
+
+      // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
+      String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
+
+      unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+
+      String jsonBLE = create_mqtt_json_ble(
+          topicBLE, ident, printCurrentTime(), bleData.name,
+          bleData.temperature, bleData.humidity, bleData.batteryLevel,
+          bleData.accelX, bleData.accelY, bleData.accelZ, bleData.tag_id,
+          bleData.uuid, ultimaLat, ultimaLon, leer_tension_bateria(),
+          leer_tension_principal(), numPkt, bleData.motion, bleData.door);
+
+      if (mqtt.connected()) {
+        if (publish_mqtt_json(topicBLE, jsonBLE)) {
+          mqttUltimaConexionOK = millis();
+        } else {
+          Serial.println("Fallo al publicar BLE online");
+        }
+      } else {
+        flash_save_packet(jsonBLE.c_str());
+        Serial.println("MQTT desconectado. Datos BLE guardados en flash.");
+      }
+    }
+  }
+
   /*LOOP CADA 5 SEGUNDOS*/
   if (en_sensor) {
     // ---- LECTURA SENSOR ----
@@ -604,6 +646,34 @@ void loop() {
         }
       } else {
         flash_save_packet(jsonmodbus.c_str());
+      }
+    } else if (en_ble == 1) {
+      // Logic for BLE MQTT Report
+      if (bleScanner.hasNewData()) {
+        MokoSensorData data = bleScanner.getLatestData();
+        unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+
+        Serial.print("BLE Data found. Temp: ");
+        Serial.print(data.temperature);
+        Serial.println(" Sending MQTT...");
+
+        // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>
+        String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
+
+        String jsonble = create_mqtt_json_ble(
+            topicBLE, ident, printCurrentTime(), data.name, data.temperature,
+            data.humidity, data.batteryLevel, data.accelX, data.accelY,
+            data.accelZ, data.tag_id, data.uuid, ultimaLat, ultimaLon,
+            leer_tension_bateria(), leer_tension_principal(), numPkt,
+            data.motion, data.door);
+
+        if (mqtt.connected()) {
+          if (publish_mqtt_json(topicBLE, jsonble)) {
+            mqttUltimaConexionOK = millis();
+          }
+        } else {
+          flash_save_packet(jsonble.c_str());
+        }
       }
     } else {
       // Si no hay ningun sensor habilitado, enviamos reporte ADC

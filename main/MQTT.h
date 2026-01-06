@@ -31,6 +31,14 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
                                String latitud, String longitud, float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete);
 
+String create_mqtt_json_ble(String topic, String ident, String fechayhora,
+                            String name, float temp, float hum,
+                            int batteryLevel, float accelX, float accelY,
+                            float accelZ, String tag_id, String uuid,
+                            String latitud, String longitud, float Vbateria,
+                            float Vprincipal, unsigned long numeroPaquete,
+                            int motion, int door);
+
 String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
                             float adc1, float adc2);
 

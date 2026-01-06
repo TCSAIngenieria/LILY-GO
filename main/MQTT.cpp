@@ -6,7 +6,6 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
-
 #define LED_PIN 12
 const char *topicInit = "LilyGo/topicInit";
 const char *latitud = "LilyGo/LAT";
@@ -225,6 +224,33 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
   doc["reboot_count"] = rebootCount;
 
   char payload[128];
+  serializeJson(doc, payload);
+  return String(payload);
+}
+
+String create_mqtt_json_ble(String topic, String ident, String fechayhora,
+                            String name, float temp, float hum,
+                            int batteryLevel, float accelX, float accelY,
+                            float accelZ, String tag_id, String uuid,
+                            String latitud, String longitud, float Vbateria,
+                            float Vprincipal, unsigned long numeroPaquete,
+                            int motion, int door) {
+  StaticJsonDocument<512> doc;
+  doc["name"] = name;
+  doc["tag_id"] = tag_id;
+  doc["UUID"] = uuid;
+  doc["date"] = fechayhora;
+  doc["temp"] = String(temp, 2);
+  doc["hum"] = String(hum, 2);
+  doc["mov"] = motion;
+  doc["door"] = door;
+  doc["% bat"] = batteryLevel;
+  doc["Accel_X"] = accelX;
+  doc["Accel_Y"] = accelY;
+  doc["Accel_Z"] = accelZ;
+  doc["index"] = numeroPaquete;
+
+  char payload[512];
   serializeJson(doc, payload);
   return String(payload);
 }

@@ -26,6 +26,7 @@ extern uint16_t tADC;
 uint en_sensor;
 uint en_serial;
 uint en_modbus;
+uint en_ble;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
@@ -193,6 +194,22 @@ String procesarComando(String comando) {
     preferences.end();
   }
 
+  /*comando para habilitar BLE*/
+  else if (comando.startsWith("DVL+EN_BLE")) {
+    en_ble = 1;
+    en_sensor = 0;
+    en_serial = 0;
+    en_modbus = 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("ble", en_ble);
+    preferences.putUInt("sensor", 0);
+    preferences.putUInt("serial", 0);
+    preferences.putUInt("modbus", 0);
+    preferences.end();
+    respuesta = ">> HABILITADO BLE";
+  }
+
   /* comando para configurar tramas:
      DVL+MODBUS=idx,ID,FUNC,LONG
      idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
@@ -353,6 +370,12 @@ String procesarComando(String comando) {
     en_serial = preferences.getUInt("serial", 0);
     preferences.end();
     respuesta = "EN_SERIAL=" + String(en_serial);
+
+  } else if (comando == "DVL+QEN_BLE") {
+    preferences.begin("enables", true);
+    en_ble = preferences.getUInt("ble", 0);
+    preferences.end();
+    respuesta = "EN_BLE=" + String(en_ble);
 
   } else if (comando.startsWith("EXP+")) {
     // Reenvia el comando al puerto serial secundario
