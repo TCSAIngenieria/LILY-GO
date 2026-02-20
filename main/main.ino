@@ -279,12 +279,13 @@ void loop() {
 
   mqtt.loop();
   unsigned long now = millis();
-  unsigned long unahora;
+  static unsigned long unahora = 0;
   static unsigned long lastNoDataMessage = 0;
   static unsigned long last_10ms_event = 0;
   static unsigned long last_100ms_event = 0;
   static unsigned long last_1s_event = 0;
 
+  if (unahora == 0) unahora = now;
   // Estructura principal de tiempo
   if (now - last_1s_event >= 1000) {
     last_1s_event = now;
@@ -431,11 +432,11 @@ void loop() {
   // ========== FASE GPRS/WIFI ==========
   if (faseGPRS_WIFI) {
 
-    if (now - unahora >= (60 * 1000 * 60)) { // contador 1 hora
-
-      TINY_GSM_USE_WIFI = true;
-      TINY_GSM_USE_GPRS = false;
-    }
+    if (now - unahora >= 3600000UL) {  // 1 hora
+  unahora = now;                   // <- resetea el contador
+  TINY_GSM_USE_WIFI = true;
+  TINY_GSM_USE_GPRS = false;
+  }
 
     if (TINY_GSM_USE_WIFI == true && TINY_GSM_USE_GPRS == false &&
         WiFi.status() != WL_CONNECTED) {
@@ -810,9 +811,12 @@ void conectar_WiFi() {
     TINY_GSM_USE_WIFI = true;
     TINY_GSM_USE_GPRS = false;
   } else {
-    Serial.println("No se pudo conectar a WiFi. Esperando boton...");
-    wifiConfigurado = false;
-    TINY_GSM_USE_WIFI = false;
-    TINY_GSM_USE_GPRS = true;
-  }
+    Serial.println("No se pudo conectar a WiFi. Pasando a GPRS...");
+  wifiConfigurado = false;
+  TINY_GSM_USE_WIFI = false;
+  TINY_GSM_USE_GPRS = true;
+
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+}
 }
