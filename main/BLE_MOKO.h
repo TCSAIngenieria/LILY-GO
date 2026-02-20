@@ -9,6 +9,8 @@
 #include <NimBLEScan.h>
 #include <NimBLEUtils.h>
 
+#include <vector>
+
 struct MokoSensorData {
   bool valid;
   String name;
@@ -33,12 +35,14 @@ public:
   BLEMokoScanner();
   void begin();
   void loop();
-  MokoSensorData getLatestData();
+  // Devuelve true si sacó un dato de la cola, false si vacía
+  bool getNextDevice(MokoSensorData *data);
   bool hasNewData();
 
 private:
   NimBLEScan *pBLEScan;
-  MokoSensorData latestData;
+  // Cola de dispositivos encontrados en el ultimo scan
+  std::vector<MokoSensorData> deviceQueue;
   bool newDataAvailable;
   unsigned long lastScanTime;
   const unsigned long SCAN_INTERVAL = 30000; // Scan every 30 seconds

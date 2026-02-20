@@ -1,0 +1,48 @@
+# Descripción del Proyecto LILY-GO
+
+## 1. Visión General
+Este proyecto implementa un firmware para dispositivos **LILYGO T-SIM7000G (ESP32)**, diseñado para aplicaciones de telemetría IoT. El sistema es capaz de recolectar datos de sensores, obtener ubicación GPS y transmitirlos a un servidor central a través de redes GPRS o WiFi, utilizando el protocolo MQTT.
+
+## 2. Alcance del Proyecto
+El firmware está orientado a la monitorización remota de activos, permitiendo:
+- **Geolocalización:** Rastreo de ubicación mediante GNSS (GPS/GLONASS).
+- **Telemetría de Sensores:** Lectura de sensores analógicos (ADC), digitales (DS18B20) e industriales (Modbus RTU).
+- **Conectividad Híbrida:** Redundancia de comunicación mediante GPRS (celular) y WiFi.
+- **Gestión Remota:** Configuración y actualización de firmware (FOTA) de manera remota.
+- **Almacenamiento Local:** Buffering de datos en memoria no volátil cuando no hay conectividad.
+
+## 3. Especificaciones Técnicas
+
+### 3.1 Hardware Soportado
+- **MCU:** ESP32 (Dual Core, WiFi/BLE).
+- **Módem:** SIMCom SIM7000G (LTE CAT-M1 / NB-IoT / GPRS / GNSS).
+
+### 3.2 Funcionalidades Clave
+
+#### Conectividad y Protocolos
+- **MQTT:** Protocolo principal para envío de datos y recepción de comandos.
+- **Modo Híbrido:** Prioriza la conexión WiFi cuando está disponible; cambia automáticamente a GPRS en caso contrario.
+- **Buffering (Flash):** Almacenamiento temporal de paquetes en memoria SPIFFS/LittleFS ante cortes de conexión para evitar pérdida de datos.
+
+#### Sensores e Interfaces
+- **ADC (Analógico):**
+  - Lectura de 3 canales analógicos.
+  - Configuración de filtros (umbral mínimo), factores de calibración (pendiente/offset) y alisado (promedio móvil).
+- **Modbus RTU (RS485):**
+  - Maestro Modbus para interrogar dispositivos esclavos industriales.
+  - Configuración dinámica de tramas de consulta (ID, Función, Dirección, Cantidad).
+- **Sensores Dedicados:** Soporte nativo para sensor de temperatura DS18B20.
+- **Expansora I/O:** Comunicación con placas expansoras vía puerto serial secundario.
+
+#### Gestión del Dispositivo
+- **Modo AP (Access Point):** Servidor web integrado para configuración inicial (WiFi, parámetros MQTT) activable mediante botón físico.
+- **Comandos Seriales/Remotos:** Interfaz de línea de comandos (CLI) completa para configuración en tiempo real (ver `comandos.MD`).
+- **FOTA:** Actualización de firmware vía HTTP.
+- **Watchdog:** Mecanismos de reinicio automático ante fallos de software o módem.
+
+## 4. Arquitectura de Datos
+El sistema reporta datos en formato JSON a través de tópicos MQTT específicos:
+- `DVL/LILY-GO/<ID>`: Tópico principal de telemetría.
+- `DVL/LILY-GO/<ID>/ADC`: Reportes específicos de entradas analógicas.
+
+Los paquetes incluyen timestamp, ubicación, e información de sensores según la configuración habilitada (`EN_SENSOR`, `EN_SERIAL`, `EN_MODBUS`).

@@ -1,17 +1,18 @@
 #include "FOTA.h"
-#include <WiFi.h>              // Necesario para WiFi.status() y WL_CONNECTED
-#include <WiFiClientSecure.h>  // Para conexion HTTPS y client.setInsecure()
-#include <HTTPClient.h>
-#include <Update.h>
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include <HTTPClient.h>
+#include <Update.h>
+#include <WiFi.h>             // Necesario para WiFi.status() y WL_CONNECTED
+#include <WiFiClientSecure.h> // Para conexion HTTPS y client.setInsecure()
+
 
 FOTAClass FOTA;
 WiFiClientSecure client;
 
-static bool updateStarted = false;  // Para evitar repetir la actualizacion
+static bool updateStarted = false; // Para evitar repetir la actualizacion
 
-void FOTAClass::startUpdate(const String& url) {
+void FOTAClass::startUpdate(const String &url) {
   if (updateStarted) {
     Serial.println("FOTA ya iniciada, ignorando llamada.");
     return;
@@ -27,13 +28,13 @@ void FOTAClass::startUpdate(const String& url) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("No hay conexion WiFi. No se puede actualizar.");
     updateStarted = false;
-    esp_task_wdt_add(NULL);  // Reactivo watchdog
+    esp_task_wdt_add(NULL); // Reactivo watchdog
     return;
   }
 
   HTTPClient http;
   Serial.println("Conectando al servidor...");
-  client.setInsecure();  // Desactiva validacion SSL (usar solo para pruebas)
+  client.setInsecure(); // Desactiva validacion SSL (usar solo para pruebas)
   http.begin(client, url);
 
   int httpCode = http.GET();
@@ -56,7 +57,8 @@ void FOTAClass::startUpdate(const String& url) {
 
   bool canBegin = Update.begin(contentLength);
   if (!canBegin) {
-    Serial.println("No se pudo iniciar la actualizacion. Memoria insuficiente?");
+    Serial.println(
+        "No se pudo iniciar la actualizacion. Memoria insuficiente?");
     http.end();
     updateStarted = false;
     esp_task_wdt_add(NULL);
@@ -64,7 +66,7 @@ void FOTAClass::startUpdate(const String& url) {
   }
 
   Serial.println("Comenzando descarga y actualizacion...");
-  WiFiClient* stream = http.getStreamPtr();
+  WiFiClient *stream = http.getStreamPtr();
 
   size_t written = 0;
   const size_t bufferSize = 512;
@@ -94,7 +96,7 @@ void FOTAClass::startUpdate(const String& url) {
 
       written += writtenBytes;
 
-      esp_task_wdt_reset();  // Resetea el watchdog
+      esp_task_wdt_reset(); // Resetea el watchdog
       yield();
       delay(1);
 
@@ -117,7 +119,8 @@ void FOTAClass::startUpdate(const String& url) {
       esp_task_wdt_add(NULL);
     }
   } else {
-    Serial.printf("Descarga incompleta: %d de %d bytes\n", (int)written, contentLength);
+    Serial.printf("Descarga incompleta: %d de %d bytes\n", (int)written,
+                  contentLength);
     updateStarted = false;
     esp_task_wdt_add(NULL);
   }

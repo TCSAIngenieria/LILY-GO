@@ -1,0 +1,137 @@
+# Documentación de Comandos del Proyecto LILY-GO
+
+Este documento detalla todos los comandos disponibles en el sistema, su sintaxis y ejemplos de uso. Los comandos se envían a través del puerto serial.
+
+## Convenciones
+- Los comandos comienzan generalmente con el prefijo `DVL+`.
+- Los parámetros se separan por comas u otros delimitadores según el comando.
+- La mayoría de las configuraciones persisten en la memoria flash (Preferences) y se mantienen tras un reinicio.
+
+---
+
+## 1. Configuración del Sistema
+
+### Identificación y Ubicación
+
+| Comando | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `DVL+ID=<id>` | Establece el identificador del dispositivo. También actualiza el tópico MQTT. | `DVL+ID=EQUIPO_01` |
+| `DVL+SLAT=<lat>` | Establece la latitud del dispositivo. | `DVL+SLAT=-34.6037` |
+| `DVL+SLONG=<lon>` | Establece la longitud del dispositivo. | `DVL+SLONG=-58.3816` |
+
+### Trama de Datos y Comunicación
+
+| Comando | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `DVL+SFINI=<marker>` | Establece el marcador de inicio de la trama de datos. | `DVL+SFINI=DATA,` |
+| `DVL+SFFIN=<marker>` | Establece el marcador de fin de la trama de datos. | `DVL+SFFIN=\r` |
+| `DVL+SPARSE=<char>` | Establece el carácter separador de campos en la trama. | `DVL+SPARSE=;` |
+| `DVL+STIME=<seg>` | Establece el intervalo de publicación de datos (en segundos). | `DVL+STIME=60` |
+
+### Habilitaciones (Flags)
+
+| Comando | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `DVL+EN_SENSOR` | Habilita la lectura del sensor principal. | `DVL+EN_SENSOR` |
+| `DVL+EN_SERIAL` | Habilita la lectura del puerto serial secundario. (Excluyente con Modbus). | `DVL+EN_SERIAL` |
+| `DVL+EN_MODBUS=<1\|0>` | Habilita (`1`) o deshabilita (`0`) la funcionalidad Modbus. Al habilitar, deshabilita `EN_SERIAL`. | `DVL+EN_MODBUS=1` |
+
+### Actualización FOTA
+
+| Comando | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware Over-The-Air desde la URL especificada. | `DVL+FOTA=http://server.com/firmware.bin` |
+
+### Control de Hardware
+
+| Comando | Descripción | Ejemplo |
+| :--- | :--- | :--- |
+| `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
+| `DVL+EXP_RESET` | Reinicia la placa expansora (cicla la energía del pin `SENSOR_POWER_PIN`). | `DVL+EXP_RESET` |
+
+---
+
+## 2. Configuración ADC (Analógico)
+
+Estos comandos permiten calibrar y configurar el comportamiento de las entradas analógicas (ADC0, ADC1, ADC2).
+
+### Filtro (`SFIL`)
+Configura un filtro de umbral mínimo.
+- **Sintaxis:** `DVL+SFIL=n,m,p`
+  - `n`: Índice del canal (0-2).
+  - `m`: Umbral mínimo.
+  - `p`: Valor de reemplazo si la lectura <= `m`.
+- **Ejemplo:** `DVL+SFIL=0,0.5,0.0` (Si ADC0 <= 0.5, leerá 0.0).
+
+### Factor de Calibración (`SFACTOR`)
+Ajusta la lectura con una ecuación lineal: `Valor = (Lectura * m) + p`.
+- **Sintaxis:** `DVL+SFACTOR=n,m,p`
+  - `n`: Índice del canal (0-2).
+  - `m`: Pendiente (factor multiplicativo).
+  - `p`: Offset.
+- **Ejemplo:** `DVL+SFACTOR=1,1.05,0.2`
+
+### Alisado (`SALI`)
+Configura el número de muestras para el promedio móvil.
+- **Sintaxis:** `DVL+SALI=<val>`
+- **Ejemplo:** `DVL+SALI=50` (Promedio de 50 muestras).
+
+### Tiempo de Muestreo (`STADC`)
+Configura cada cuánto se toma una muestra ADC (multiplicador de 100ms).
+- **Sintaxis:** `DVL+STADC=<val>`
+- **Ejemplo:** `DVL+STADC=10` (10 * 100ms = 1 segundo).
+
+---
+
+## 3. Configuración Modbus
+
+Permite definir tramas Modbus para ser consultadas periódicamente.
+
+### Configurar Trama
+- **Sintaxis:** `DVL+MODBUS=idx,ID,FUNC,ADDR,QTY`
+  - `idx`: Índice de la trama (1-5).
+  - `ID`: ID del esclavo Modbus.
+  - `FUNC`: Código de función.
+  - `ADDR`: Dirección de memoria inicial.
+  - `QTY`: Cantidad de registros.
+- **Ejemplo:** `DVL+MODBUS=1,1,3,100,2` (Trama 1: Esclavo 1, Función 3, Dirección 100, 2 Registros).
+
+### Borrar Trama
+- **Sintaxis:** `DVL+MODBUSCLR=<idx|ALL>`
+- **Ejemplo:** 
+  - `DVL+MODBUSCLR=1` (Borra la trama 1).
+  - `DVL+MODBUSCLR=ALL` (Borra todas las tramas).
+
+---
+
+## 4. Comandos de Consulta (Query)
+
+Estos comandos devuelven el estado actual de las configuraciones.
+
+| Comando | Retorna (Ejemplo) | Descripción |
+| :--- | :--- | :--- |
+| `DVL+VER` | `VERSION=v1.0` | Versión del firmware. |
+| `DVL+Qtime` | `TIME=60` | Intervalo de publicación. |
+| `DVL+QID` | *(Asumido, si existe)* | Consultar ID (no explícito en código revisado, ver `DVL+ID` para setear). |
+| `DVL+QLAT` | `LAT=-34.xxx` | Última latitud configurada. |
+| `DVL+QLONG` | `LONG=-58.xxx` | Última longitud configurada. |
+| `DVL+QFINI` | `START_MARKER=DATA,` | Marcador de inicio. |
+| `DVL+QFFIN` | `END_MARKER=\r` | Marcador de fin. |
+| `DVL+QPARSE` | `SEPARATOR=,` | Separador de trama. |
+| `DVL+QEN_SENSOR`| `EN_SENSOR=1` | Estado de lectura de sensor. |
+| `DVL+QEN_SERIAL`| `EN_SERIAL=0` | Estado de puerto serial secundario. |
+| `DVL+QEN_MODBUS`| `EN_MODBUS=1` | Estado de Modbus. |
+| `DVL+QMODBUS` | `[OK] Ver detalle por Serial` | Imprime configuración Modbus detallada. |
+| `DVL+QFIL` | `FIL0=...` | Configuración de filtros ADC. |
+| `DVL+QFACTOR` | `FAC0=...` | Configuración de factores ADC. |
+| `DVL+QTADC` | `TIME ADC=10` | Tiempo de muestreo ADC. |
+| `DVL+QALI` | `ALISADO=50` | Valor de alisado ADC. |
+
+---
+
+## 5. Comandos de Expansora (`EXP+`)
+
+Cualquier comando que comience con `EXP+` será retransmitido tal cual al puerto serial secundario (`SensorSerial`). El sistema espera una respuesta de la expansora por hasta 5 segundos.
+
+- **Sintaxis:** `EXP+<cualquier_comando>`
+- **Ejemplo:** `EXP+LEER` (Envía "EXP+LEER" a la expansora y devuelve su respuesta).

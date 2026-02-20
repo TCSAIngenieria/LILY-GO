@@ -1,0 +1,10 @@
+feat(ble): incorporar soporte para sensores MOKO L02S y PaPeR
+
+- Implementar el escaneo y parseo de datos de los sensores BLE MOKO PaPeR y L02S.
+- Utilizar una cola (std::vector) para procesar múltiples dispositivos BLE en lugar de guardar sólo el último encontrado.
+- Extraer información relevante como temperatura, humedad, nivel de batería, acelerómetro, estado de puerta y movimiento.
+- Modificar BLE_MOKO.h para soportar la cola temporal y el nuevo método getNextDevice.
+- Limpiar y renombrar rutinas de escaneo de BLE_MOKO.cpp para adaptarlas al nuevo flujo asíncrono.
+- Agregar archivos de documentación de los comandos (COMANDOS.md) y del controlador en general (descripcion_proyecto.txt).
+- Añadir manuales de MOKO Door Sensor y MOKO Button (PDFs en MOKO_Doc).
+- Fix: Añadir la librería esp_task_wdt.h faltante en FOTA.cpp.

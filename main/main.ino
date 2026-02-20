@@ -493,30 +493,39 @@ void loop() {
     bleScanner.loop();
 
     if (bleScanner.hasNewData()) {
-      Serial.println("Detectados nuevos datos BLE, preparando envio MQTT...");
-      MokoSensorData bleData = bleScanner.getLatestData();
+      Serial.println("Procesando cola de dispositivos BLE detectados...");
+      MokoSensorData bleData;
 
-      // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
-      String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
+      // Procesamos TODOS los sensores que haya en la cola
+      while (bleScanner.getNextDevice(&bleData)) {
+        Serial.print(">> Procesando sensor: ");
+        Serial.println(bleData.mac);
 
-      unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
+        String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
 
-      String jsonBLE = create_mqtt_json_ble(
-          topicBLE, ident, printCurrentTime(), bleData.name,
-          bleData.temperature, bleData.humidity, bleData.batteryLevel,
-          bleData.accelX, bleData.accelY, bleData.accelZ, bleData.tag_id,
-          bleData.uuid, ultimaLat, ultimaLon, leer_tension_bateria(),
-          leer_tension_principal(), numPkt, bleData.motion, bleData.door);
+        unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
-      if (mqtt.connected()) {
-        if (publish_mqtt_json(topicBLE, jsonBLE)) {
-          mqttUltimaConexionOK = millis();
+        String jsonBLE = create_mqtt_json_ble(
+            topicBLE, ident, printCurrentTime(), bleData.name,
+            bleData.temperature, bleData.humidity, bleData.batteryLevel,
+            bleData.accelX, bleData.accelY, bleData.accelZ, bleData.tag_id,
+            bleData.uuid, ultimaLat, ultimaLon, leer_tension_bateria(),
+            leer_tension_principal(), numPkt, bleData.motion, bleData.door);
+
+        if (mqtt.connected()) {
+          if (publish_mqtt_json(topicBLE, jsonBLE)) {
+            mqttUltimaConexionOK = millis();
+            delay(100); // Pequeño delay para no saturar buffer TX si hay muchos
+          } else {
+            Serial.println("Fallo al publicar BLE online");
+          }
         } else {
-          Serial.println("Fallo al publicar BLE online");
+          flash_save_packet(jsonBLE.c_str());
+          Serial.println("MQTT desconectado. Datos BLE guardados en flash.");
         }
-      } else {
-        flash_save_packet(jsonBLE.c_str());
-        Serial.println("MQTT desconectado. Datos BLE guardados en flash.");
+
+        esp_task_wdt_reset(); // Alimentar perro por cada sensor procesado
       }
     }
   }
@@ -650,29 +659,33 @@ void loop() {
     } else if (en_ble == 1) {
       // Logic for BLE MQTT Report
       if (bleScanner.hasNewData()) {
-        MokoSensorData data = bleScanner.getLatestData();
-        unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+        MokoSensorData data;
+        while (bleScanner.getNextDevice(&data)) {
+          unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
-        Serial.print("BLE Data found. Temp: ");
-        Serial.print(data.temperature);
-        Serial.println(" Sending MQTT...");
+          Serial.print("BLE Data found. Temp: ");
+          Serial.print(data.temperature);
+          Serial.println(" Sending MQTT...");
 
-        // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>
-        String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
+          // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>
+          String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
 
-        String jsonble = create_mqtt_json_ble(
-            topicBLE, ident, printCurrentTime(), data.name, data.temperature,
-            data.humidity, data.batteryLevel, data.accelX, data.accelY,
-            data.accelZ, data.tag_id, data.uuid, ultimaLat, ultimaLon,
-            leer_tension_bateria(), leer_tension_principal(), numPkt,
-            data.motion, data.door);
+          String jsonble = create_mqtt_json_ble(
+              topicBLE, ident, printCurrentTime(), data.name, data.temperature,
+              data.humidity, data.batteryLevel, data.accelX, data.accelY,
+              data.accelZ, data.tag_id, data.uuid, ultimaLat, ultimaLon,
+              leer_tension_bateria(), leer_tension_principal(), numPkt,
+              data.motion, data.door);
 
-        if (mqtt.connected()) {
-          if (publish_mqtt_json(topicBLE, jsonble)) {
-            mqttUltimaConexionOK = millis();
+          if (mqtt.connected()) {
+            if (publish_mqtt_json(topicBLE, jsonble)) {
+              mqttUltimaConexionOK = millis();
+              delay(50);
+            }
+          } else {
+            flash_save_packet(jsonble.c_str());
           }
-        } else {
-          flash_save_packet(jsonble.c_str());
+          esp_task_wdt_reset();
         }
       }
     } else {
