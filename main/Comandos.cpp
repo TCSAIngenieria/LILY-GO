@@ -27,6 +27,7 @@ uint en_sensor;
 uint en_serial;
 uint en_modbus;
 uint en_ble;
+uint en_adc;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
@@ -210,6 +211,22 @@ String procesarComando(String comando) {
     respuesta = ">> HABILITADO BLE";
   }
 
+  /*comando para habilitar o deshabilitar ADC*/
+  else if (comando.startsWith("DVL+EN_ADC=")) {
+    String v = comando.substring(String("DVL+EN_ADC=").length());
+    v.trim();
+    en_adc = (v == "1") ? 1 : 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("adc", en_adc);
+    preferences.end();
+    if (en_adc == 1) {
+      respuesta = ">> HABILITADO REPORTE ADC INDEPENDIENTE";
+    } else {
+      respuesta = ">> DESHABILITADO REPORTE ADC INDEPENDIENTE";
+    }
+  }
+
   /* comando para configurar tramas:
      DVL+MODBUS=idx,ID,FUNC,LONG
      idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
@@ -376,6 +393,12 @@ String procesarComando(String comando) {
     en_ble = preferences.getUInt("ble", 0);
     preferences.end();
     respuesta = "EN_BLE=" + String(en_ble);
+
+  } else if (comando == "DVL+QEN_ADC") {
+    preferences.begin("enables", true);
+    en_adc = preferences.getUInt("adc", 0);
+    preferences.end();
+    respuesta = "EN_ADC=" + String(en_adc);
 
   } else if (comando.startsWith("EXP+")) {
     // Reenvia el comando al puerto serial secundario

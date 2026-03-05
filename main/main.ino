@@ -48,7 +48,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.01.01";
+String versionado = "V02.02.02";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -71,6 +71,7 @@ extern uint en_sensor;
 extern uint en_serial;
 extern uint en_modbus;
 extern uint en_ble;
+extern uint en_adc;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -163,6 +164,7 @@ void setup() {
   en_serial = preferences.getUInt("serial", 0);
   en_modbus = preferences.getUInt("modbus", 0);
   en_ble = preferences.getUInt("ble", 0);
+  en_adc = preferences.getUInt("adc", 0);
   preferences.end();
 
   // --- Contador de reinicios ---
@@ -244,10 +246,10 @@ void setup() {
 
   /*CONFIGURACION WIFI*/
   preferences.begin("wifi", true);
-  ssid = preferences.getString("ssid", "Flash-PaPeR");
-  password = preferences.getString("password", "Ayanami84");
-  // ssid = preferences.getString("ssid", "Invitados");
-  // password = preferences.getString("password", "TCinvitados");
+  // ssid = preferences.getString("ssid", "Flash-PaPeR");
+  // password = preferences.getString("password", "Ayanami84");
+  ssid = preferences.getString("ssid", "Invitados");
+  password = preferences.getString("password", "TCinvitados");
   preferences.end();
 
   if (ssid.length() > 0) {
@@ -597,10 +599,13 @@ void loop() {
 
         Serial.println(WiFi.status());
       }
+    }
 
-    } else if (en_serial == 1) {
+    if (en_serial == 1) {
 
       Serial.print("Serial habilitado. Enviando dato por MQTT...");
+
+      String topicSerial = topic1 + "/SERIAL";
 
       String jsonserial = create_mqtt_json_serial(
           topic1, ident, sensorValues[0], sensorValues[1], sensorValues[2],
@@ -612,10 +617,10 @@ void loop() {
 
       if (mqtt.connected()) {
 
-        if (topic1.length() == 0 || jsonserial.length() == 0) {
+        if (topicSerial.length() == 0 || jsonserial.length() == 0) {
           Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
-          if (publish_mqtt_json(topic1, jsonserial)) {
+          if (publish_mqtt_json(topicSerial, jsonserial)) {
             mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
           }
         }
@@ -626,8 +631,9 @@ void loop() {
         Serial.println(mqtt.connected());
         Serial.println(WiFi.status());
       }
+    }
 
-    } else if (en_modbus == 1) {
+    if (en_modbus == 1) {
 
       Serial.print("Modbus habilitado. Enviando dato por MQTT...");
 
@@ -647,7 +653,9 @@ void loop() {
       } else {
         flash_save_packet(jsonmodbus.c_str());
       }
-    } else if (en_ble == 1) {
+    }
+
+    if (en_ble == 1) {
       // Logic for BLE MQTT Report
       if (bleScanner.hasNewData()) {
         MokoSensorData data = bleScanner.getLatestData();
@@ -675,9 +683,10 @@ void loop() {
           flash_save_packet(jsonble.c_str());
         }
       }
-    } else {
-      // Si no hay ningun sensor habilitado, enviamos reporte ADC
-      Serial.print("Ningun sensor habilitado. Enviando reporte ADC...");
+    }
+
+    if (en_adc == 1) {
+      Serial.print("ADC habilitado. Enviando reporte ADC...");
       String jsonadc = create_mqtt_json_adc(
           ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
 
