@@ -5,6 +5,7 @@
 #include "GNSS.h" // Para setLatitude, setLongitude, setLocationValid
 #include "Modbus.h"
 #include <Preferences.h>
+#include "MQTT.h"
 
 extern Preferences preferences;
 
@@ -146,6 +147,13 @@ String procesarComando(String comando) {
     ident = ident_s;
 
     topic1 = "DVL/LILY-GO/" + ident;
+
+    // Desconectar de MQTT para forzar una revinculacion en el main loop
+    // con el nuevo ID y nuevas subscripciones a los topicos (COMANDOS, FOTA)
+    if (mqtt.connected()) {
+      mqtt.disconnect();
+    }
+
     respuesta = "Rident_OK (TOPIC: " + topic1 + ")";
 
   } else if (comando.startsWith("DVL+FOTA=")) {
