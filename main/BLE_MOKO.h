@@ -8,6 +8,7 @@
 #include <NimBLEDevice.h>
 #include <NimBLEScan.h>
 #include <NimBLEUtils.h>
+#include <vector>
 
 struct MokoSensorData {
   bool valid;
@@ -33,12 +34,12 @@ public:
   BLEMokoScanner();
   void begin();
   void loop();
-  MokoSensorData getLatestData();
+  std::vector<MokoSensorData> getLatestData();
   bool hasNewData();
 
 private:
   NimBLEScan *pBLEScan;
-  MokoSensorData latestData;
+  std::vector<MokoSensorData> latestData;
   bool newDataAvailable;
   unsigned long lastScanTime;
   const unsigned long SCAN_INTERVAL = 30000; // Scan every 30 seconds

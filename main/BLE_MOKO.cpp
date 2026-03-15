@@ -1,6 +1,8 @@
 #include "BLE_MOKO.h"
 
-static MokoSensorData _tempData;
+#include <vector>
+
+static std::vector<MokoSensorData> _tempDataList;
 static bool _foundDevice = false;
 
 class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
@@ -14,12 +16,14 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
 
     std::string macAddress = advertisedDevice->getAddress().toString();
 
-    // Check for specific MAC or name
-    bool isTarget = (macAddress == "f0:74:bf:f0:3c:91") ||
-                    (macAddress == "F0:74:BF:F0:3C:91");
+    // Check for "PaPeR" in the advertised name
+    bool isTarget = false;
+    if (advertisedDevice->haveName() && advertisedDevice->getName().find("PaPeR") != std::string::npos) {
+        isTarget = true;
+    }
 
     if (isTarget) {
-      Serial.println(">>> TARGET DEVICE FOUND <<<");
+      Serial.println(">>> TARGET DEVICE FOUND (PaPeR) <<<");
       Serial.print("MAC: ");
       Serial.println(macAddress.c_str());
       Serial.print("RSSI: ");
@@ -41,6 +45,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
         Serial.println(hexData);
 
+        MokoSensorData _tempData;
         // Also update _tempData for this device so we can see it in normal flow
         // if needed
         _tempData.rawHex = hexData;
@@ -49,7 +54,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         _tempData.mac = macAddress.c_str();
         _tempData.rssi = advertisedDevice->getRSSI();
         _tempData.lastUpdate = millis();
-        _foundDevice = true;
+        // (La captura de target manual no se guarda aquí si se procesa abajo)
       } else {
         Serial.println("No Manufacturer Data");
       }
@@ -87,6 +92,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       // Offsets encontrados: Temp[19-20], Hum[21-22], Batt[23-24]
       // Motion? Index 27 (byte 28) seems to be 0x01 in example.
       if (payloadVector.size() >= 28) {
+        MokoSensorData _tempData; // Local object to store this device's data
+
         // Temp (Big Endian)
         int16_t tempRaw =
             ((uint16_t)payloadVector[19] << 8) | payloadVector[20];
@@ -150,6 +157,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         _tempData.mac = cleanMac;
         _tempData.rssi = advertisedDevice->getRSSI();
         _tempData.lastUpdate = millis();
+
+        _tempDataList.push_back(_tempData);
         _foundDevice = true;
       }
 
@@ -163,6 +172,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       Serial.print("RSSI: ");
       Serial.println(advertisedDevice->getRSSI());
 
+      MokoSensorData _tempData;
       _tempData.valid = true;
       _tempData.name = advertisedDevice->getName().c_str();
       String cleanMac = advertisedDevice->getAddress().toString().c_str();
@@ -206,6 +216,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                         _tempData.temperature, _tempData.humidity, (int)batt);
         }
 
+        _tempDataList.push_back(_tempData);
         _foundDevice = true;
       }
     }
@@ -231,7 +242,7 @@ void BLEMokoScanner::begin() {
       true); // Active scan to get Scan Response (Data might be there)
   pBLEScan->setInterval(100);
   pBLEScan->setWindow(99);
-  pBLEScan->setDuplicateFilter(false); // See all advertisements
+  pBLEScan->setDuplicateFilter(true); // Filter duplicates in a single scan session
   _initialized = true;
 }
 
@@ -245,6 +256,7 @@ void BLEMokoScanner::loop() {
     lastScanTime = now;
     Serial.println("Iniciando escaneo NimBLE...");
     _foundDevice = false; // Reset for this scan
+    _tempDataList.clear(); // Limpiar la lista de dispisitivos detectados en iteraciones previas
 
     // Explicitly pass 'false' to ensure we pick the synchronous overload
     // returning results start(duration, is_continue)
@@ -272,17 +284,17 @@ void BLEMokoScanner::loop() {
       return;
     }
 
-    if (_foundDevice) {
-      latestData = _tempData;
+    if (_foundDevice && _tempDataList.size() > 0) {
+      latestData = _tempDataList;
       newDataAvailable = true;
-      Serial.println("Datos de sensor actualizados.");
+      Serial.println("Datos de sensor actualizados (" + String(latestData.size()) + " dispositivos).");
     }
 
     pBLEScan->clearResults();
   }
 }
 
-MokoSensorData BLEMokoScanner::getLatestData() {
+std::vector<MokoSensorData> BLEMokoScanner::getLatestData() {
   newDataAvailable = false; // Clear flag on read
   return latestData;
 }
