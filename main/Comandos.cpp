@@ -160,21 +160,33 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+VER") {
     respuesta = "VERSION=" + versionado;
 
-    /*comando para habilitar sensor*/
-  } else if (comando.startsWith("DVL+EN_SENSOR")) {
-    en_sensor = 1;
+    /*comando para habilitar o deshabilitar sensor*/
+  } else if (comando.startsWith("DVL+EN_SENSOR=")) {
+    String v = comando.substring(String("DVL+EN_SENSOR=").length());
+    v.trim();
+    en_sensor = (v == "1") ? 1 : 0;
     preferences.begin("enables", false);
     preferences.putUInt("sensor", en_sensor);
     preferences.end();
-    respuesta = ">> HABILITADO LECTURA SENSOR";
+    if (en_sensor == 1) {
+      respuesta = ">> HABILITADO LECTURA SENSOR";
+    } else {
+      respuesta = ">> DESHABILITADO LECTURA SENSOR";
+    }
 
-    /*comando para habilitar puerto serial secundario*/
-  } else if (comando.startsWith("DVL+EN_SERIAL")) {
-    en_serial = 1;
+    /*comando para habilitar o deshabilitar puerto serial secundario*/
+  } else if (comando.startsWith("DVL+EN_SERIAL=")) {
+    String v = comando.substring(String("DVL+EN_SERIAL=").length());
+    v.trim();
+    en_serial = (v == "1") ? 1 : 0;
     preferences.begin("enables", false);
     preferences.putUInt("serial", en_serial);
     preferences.end();
-    respuesta = ">> HABILITADO LECTURA SERIAL";
+    if (en_serial == 1) {
+      respuesta = ">> HABILITADO LECTURA SERIAL";
+    } else {
+      respuesta = ">> DESHABILITADO LECTURA SERIAL";
+    }
   } /*comando para habilitar MODBUS (excluyente con EN_SERIAL)*/
   else if (comando.startsWith("DVL+EN_MODBUS=")) {
     String v = comando.substring(String("DVL+EN_MODBUS=").length());
@@ -195,20 +207,26 @@ String procesarComando(String comando) {
     preferences.end();
   }
 
-  /*comando para habilitar BLE*/
-  else if (comando.startsWith("DVL+EN_BLE")) {
-    en_ble = 1;
-    en_sensor = 0;
-    en_serial = 0;
-    en_modbus = 0;
+  /*comando para habilitar o deshabilitar BLE*/
+  else if (comando.startsWith("DVL+EN_BLE=")) {
+    String v = comando.substring(String("DVL+EN_BLE=").length());
+    v.trim();
+    en_ble = (v == "1") ? 1 : 0;
 
     preferences.begin("enables", false);
     preferences.putUInt("ble", en_ble);
-    preferences.putUInt("sensor", 0);
-    preferences.putUInt("serial", 0);
-    preferences.putUInt("modbus", 0);
+    if (en_ble == 1) {
+      en_sensor = 0;
+      en_serial = 0;
+      en_modbus = 0;
+      preferences.putUInt("sensor", 0);
+      preferences.putUInt("serial", 0);
+      preferences.putUInt("modbus", 0);
+      respuesta = ">> HABILITADO BLE";
+    } else {
+      respuesta = ">> DESHABILITADO BLE";
+    }
     preferences.end();
-    respuesta = ">> HABILITADO BLE";
   }
 
   /*comando para habilitar o deshabilitar ADC*/

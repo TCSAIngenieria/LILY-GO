@@ -15,10 +15,10 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
-| `DVL+EN_SENSOR` | Habilita la lectura del sensor conectado (ej. DS18B20). | `DVL+EN_SENSOR` |
-| `DVL+EN_SERIAL` | Habilita la lectura del puerto serial secundario. | `DVL+EN_SERIAL` |
+| `DVL+EN_SENSOR=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del sensor conectado (ej. DS18B20). | `DVL+EN_SENSOR=1` |
+| `DVL+EN_SERIAL=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del puerto serial secundario. | `DVL+EN_SERIAL=1` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (1) o deshabilita (0) el módulo Modbus. Al habilitar Modbus, se deshabilita Serial. | `DVL+EN_MODBUS=1` |
-| `DVL+EN_BLE` | Habilita el escaneo de sensores BLE (deshabilita otros sensores). | `DVL+EN_BLE` |
+| `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Al habilitar, deshabilita otros sensores. | `DVL+EN_BLE=1` |
 | `DVL+EXP_RESET` | Reinicia la placa expansora (ciclo de energía). | `DVL+EXP_RESET` |
 
 ## Comandos de Modbus

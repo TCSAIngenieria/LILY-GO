@@ -64,7 +64,7 @@ void DS18B20::loop() {
       break;
 
     case APAGADO:
-      if (now - tiempoReinicio > 1000) {
+      if (now - tiempoReinicio > 5000) {
         digitalWrite(SENSOR_POWER_PIN, HIGH);
         tiempoReinicio = now;
         estadoReinicio = ENCENDIDO;
@@ -72,7 +72,7 @@ void DS18B20::loop() {
       break;
 
     case ENCENDIDO:
-      if (now - tiempoReinicio > 500) {
+      if (now - tiempoReinicio > 2000) {
         Serial.println(" Sonda DS18B20 reiniciada.");
         tiempoUltimoCambio = now;
         initSensor();
