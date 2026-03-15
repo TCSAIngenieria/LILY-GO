@@ -48,7 +48,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.02.02";
+String versionado = "V02.02.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -246,10 +246,10 @@ void setup() {
 
   /*CONFIGURACION WIFI*/
   preferences.begin("wifi", true);
-  // ssid = preferences.getString("ssid", "Flash-PaPeR");
-  // password = preferences.getString("password", "Ayanami84");
-  ssid = preferences.getString("ssid", "Invitados");
-  password = preferences.getString("password", "TCinvitados");
+  ssid = preferences.getString("ssid", "Flash-PaPeR");
+  password = preferences.getString("password", "Ayanami84");
+  // ssid = preferences.getString("ssid", "Invitados");
+  // password = preferences.getString("password", "TCinvitados");
   preferences.end();
 
   if (ssid.length() > 0) {
@@ -578,16 +578,19 @@ void loop() {
 
     if (en_sensor == 1) {
       Serial.print("Sensor habilitado. Enviando dato por MQTT...");
+
+      String topicSensor = topic1 + "/DS18B20";
+
       String jsonsensor = create_mqtt_json_sensor(
-          topic1, ident, valorStr, printCurrentTime(), ultimaLat, ultimaLon,
+          topicSensor, ident, valorStr, printCurrentTime(),
           leer_tension_bateria(), leer_tension_principal(), numPkt);
 
       if (mqtt.connected()) {
 
-        if (topic1.length() == 0 || jsonsensor.length() == 0) {
+        if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
           Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
-          if (publish_mqtt_json(topic1, jsonsensor)) {
+          if (publish_mqtt_json(topicSensor, jsonsensor)) {
             mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
           }
         }
@@ -706,6 +709,7 @@ void loop() {
   // Keep Alive si no hay datos para transmitir
   if (now - lastNoDataMessage > 5000) {
     String jsonKeepAlive = create_mqtt_json_keepalive(ident, printCurrentTime(),
+                                                      ultimaLat, ultimaLon,
                                                       versionado, rebootCount);
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);

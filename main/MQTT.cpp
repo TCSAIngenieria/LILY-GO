@@ -115,14 +115,12 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
 
 String create_mqtt_json_sensor(String topic, String ident,
                                String valor_variable, String fechayhora,
-                               String latitud, String longitud, float Vbateria,
+                               float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<256> doc;
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
   doc["date"] = fechayhora;
-  doc["latitud"] = latitud;
-  doc["longitud"] = longitud;
   doc["Tension_bateria"] = Vbateria;
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
@@ -214,16 +212,19 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
 }
 
 String create_mqtt_json_keepalive(String ident, String fechayhora,
+                                  String latitud, String longitud,
                                   String versionado,
                                   unsigned long rebootCount) {
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<256> doc;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
+  doc["latitud"] = latitud;
+  doc["longitud"] = longitud;
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
 
-  char payload[128];
+  char payload[256];
   serializeJson(doc, payload);
   return String(payload);
 }

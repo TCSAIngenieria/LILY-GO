@@ -16,7 +16,7 @@ bool publish_mqtt_json(String topic, String jsonPayload);
 
 String create_mqtt_json_sensor(String topic, String ident,
                                String valor_variable, String fechayhora,
-                               String latitud, String longitud, float Vbateria,
+                               float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete);
 
 String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
@@ -43,6 +43,7 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
                             float adc1, float adc2);
 
 String create_mqtt_json_keepalive(String ident, String fechayhora,
+                                  String latitud, String longitud,
                                   String versionado, unsigned long rebootCount);
 
 #endif
