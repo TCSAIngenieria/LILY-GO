@@ -1,4 +1,5 @@
 #include "Comandos.h"
+#include "Debug.h"
 #include "DS18B20.h"
 #include "FOTA.h"
 #include "Flash.h"
@@ -367,7 +368,7 @@ String procesarComando(String comando) {
 
   } else if (comando == "DVL+RESET") {
     respuesta = ">> Reiniciando dispositivo...";
-    Serial.println(respuesta); // Lo mostramos antes del reset
+    DVL_PRINTLN(respuesta); // Lo mostramos antes del reset
     delay(100); // Pequeña pausa para que se imprima correctamente
     ESP.restart();
   } else if (comando == "DVL+EXP_RESET") {

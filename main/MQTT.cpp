@@ -1,4 +1,5 @@
 #include "MQTT.h"
+#include "Debug.h"
 #include "Comandos.h"
 #include "FOTA.h"
 #include "Modbus.h"
@@ -27,11 +28,11 @@ String MQTT_BROKER = "192.168.7.252"; // Valor por defecto
 int MQTT_PORT = 7183;                 // Valor por defecto
 
 boolean mqttConnect() {
-  Serial.print("Conectando a MQTT broker: ");
-  Serial.println(MQTT_BROKER);
+  DVL_PRINT("Conectando a MQTT broker: ");
+  DVL_PRINTLN(MQTT_BROKER);
 
   if (mqtt.connect(ident.c_str())) {
-    Serial.println(" Conectado a MQTT!");
+    DVL_PRINTLN(" Conectado a MQTT!");
     mqttActivo = true;
     mqttUltimaConexionOK = millis();
 
@@ -41,12 +42,12 @@ boolean mqttConnect() {
     mqtt.subscribe(topicFOTA.c_str());
     mqtt.subscribe(topicCMD.c_str());
 
-    Serial.println("📡 Suscripto a topics FOTA y COMANDOS");
+    DVL_PRINTLN("📡 Suscripto a topics FOTA y COMANDOS");
     esp_task_wdt_reset();
     return true;
   } else {
-    Serial.print(" Error al conectar a MQTT. Codigo: ");
-    Serial.println(mqtt.state());
+    DVL_PRINT(" Error al conectar a MQTT. Codigo: ");
+    DVL_PRINTLN(mqtt.state());
     esp_task_wdt_reset();
     return false;
   }
@@ -71,16 +72,16 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
     preferences.end();
 
     if (storedURL != message) {
-      Serial.println(" Nueva URL FOTA detectada. Iniciando actualizacion...");
+      DVL_PRINTLN(" Nueva URL FOTA detectada. Iniciando actualizacion...");
       FOTA.startUpdate(message);
     } else {
-      Serial.println("URL FOTA igual a la actual. Ignorando.");
+      DVL_PRINTLN("URL FOTA igual a la actual. Ignorando.");
     }
   }
 
   // COMANDOS
   else if (topicStr.endsWith("/COMANDOS")) {
-    Serial.println(" Comando MQTT recibido: " + message);
+    DVL_PRINTLN(" Comando MQTT recibido: " + message);
 
     // Construir topic de respuesta
     String topicRespuesta = "DVL/LILY-GO/" + ident + "/RESPUESTA";
@@ -93,22 +94,22 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
   }
 
   else {
-    Serial.println(" Topico MQTT no manejado: " + topicStr);
+    DVL_PRINTLN(" Topico MQTT no manejado: " + topicStr);
   }
 }
 
 bool publish_mqtt_json(String topic, String jsonPayload) {
   if (!mqtt.connected()) {
-    Serial.println("MQTT no conectado, no se puede publicar.");
+    DVL_PRINTLN("MQTT no conectado, no se puede publicar.");
     return false;
   }
 
   bool sent = mqtt.publish(topic.c_str(), jsonPayload.c_str());
-  Serial.print("Publicado JSON en topic ");
-  Serial.print(topic);
-  Serial.print(": ");
-  Serial.println(sent ? "OK" : "FALLo");
-  Serial.println(jsonPayload); // Para debug: imprime el JSON publicado
+  DVL_PRINT("Publicado JSON en topic ");
+  DVL_PRINT(topic);
+  DVL_PRINT(": ");
+  DVL_PRINTLN(sent ? "OK" : "FALLo");
+  DVL_PRINTLN(jsonPayload); // Para debug: imprime el JSON publicado
 
   return sent;
 }

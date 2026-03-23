@@ -1,4 +1,5 @@
 #include "BLE_MOKO.h"
+#include "Debug.h"
 
 #include <vector>
 
@@ -7,12 +8,12 @@ static bool _foundDevice = false;
 
 class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override {
-    Serial.print("BLE Found: ");
-    Serial.print(advertisedDevice->getName().c_str());
-    Serial.print(" MAC: ");
-    Serial.print(advertisedDevice->getAddress().toString().c_str());
-    Serial.print(" RSSI: ");
-    Serial.println(advertisedDevice->getRSSI());
+    DVL_PRINT("BLE Found: ");
+    DVL_PRINT(advertisedDevice->getName().c_str());
+    DVL_PRINT(" MAC: ");
+    DVL_PRINT(advertisedDevice->getAddress().toString().c_str());
+    DVL_PRINT(" RSSI: ");
+    DVL_PRINTLN(advertisedDevice->getRSSI());
 
     std::string macAddress = advertisedDevice->getAddress().toString();
 
@@ -23,27 +24,27 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
     }
 
     if (isTarget) {
-      Serial.println(">>> TARGET DEVICE FOUND (PaPeR) <<<");
-      Serial.print("MAC: ");
-      Serial.println(macAddress.c_str());
-      Serial.print("RSSI: ");
-      Serial.println(advertisedDevice->getRSSI());
+      DVL_PRINTLN(">>> TARGET DEVICE FOUND (PaPeR) <<<");
+      DVL_PRINT("MAC: ");
+      DVL_PRINTLN(macAddress.c_str());
+      DVL_PRINT("RSSI: ");
+      DVL_PRINTLN(advertisedDevice->getRSSI());
 
       if (advertisedDevice->haveName()) {
-        Serial.print("Name: ");
-        Serial.println(advertisedDevice->getName().c_str());
+        DVL_PRINT("Name: ");
+        DVL_PRINTLN(advertisedDevice->getName().c_str());
       }
 
       if (advertisedDevice->haveManufacturerData()) {
         std::string data = advertisedDevice->getManufacturerData();
-        Serial.print("Manufacturer Data (Hex): ");
+        DVL_PRINT("Manufacturer Data (Hex): ");
         String hexData = "";
         for (int i = 0; i < data.length(); i++) {
           char output[3];
           sprintf(output, "%02X", (unsigned char)data[i]);
           hexData += String(output);
         }
-        Serial.println(hexData);
+        DVL_PRINTLN(hexData);
 
         MokoSensorData _tempData;
         // Also update _tempData for this device so we can see it in normal flow
@@ -56,12 +57,12 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         _tempData.lastUpdate = millis();
         // (La captura de target manual no se guarda aquí si se procesa abajo)
       } else {
-        Serial.println("No Manufacturer Data");
+        DVL_PRINTLN("No Manufacturer Data");
       }
 
       if (advertisedDevice->haveServiceUUID()) {
-        Serial.print("Service UUID: ");
-        Serial.println(advertisedDevice->getServiceUUID().toString().c_str());
+        DVL_PRINT("Service UUID: ");
+        DVL_PRINTLN(advertisedDevice->getServiceUUID().toString().c_str());
       }
 
       // DUMP FULL PAYLOAD
@@ -135,12 +136,12 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
         _tempData.uuid = "EA01";
 
-        Serial.printf("[PaPeR] Parsed -> Temp: %.2f C, Hum: %.2f %%, Bat: "
+        DVL_PRINTF("[PaPeR] Parsed -> Temp: %.2f C, Hum: %.2f %%, Bat: "
                       "%d%%, D: %d, M: %d, X: %.0f, Y: %.0f, Z: %.0f\n",
                       _tempData.temperature, _tempData.humidity, battPct,
                       _tempData.door, _tempData.motion, _tempData.accelX,
                       _tempData.accelY, _tempData.accelZ);
-        Serial.printf("   >>> TagID: %s | UUID: %s\n", _tempData.tag_id.c_str(),
+        DVL_PRINTF("   >>> TagID: %s | UUID: %s\n", _tempData.tag_id.c_str(),
                       _tempData.uuid.c_str());
 
         _tempData.rawHex = "";
@@ -162,15 +163,15 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         _foundDevice = true;
       }
 
-      Serial.println("------------------------------------------------");
+      DVL_PRINTLN("------------------------------------------------");
     }
 
     if (advertisedDevice->haveName() &&
         advertisedDevice->getName().rfind("L02", 0) == 0) {
-      Serial.print("BLE: L02S device found! Name: ");
-      Serial.println(advertisedDevice->getName().c_str());
-      Serial.print("RSSI: ");
-      Serial.println(advertisedDevice->getRSSI());
+      DVL_PRINT("BLE: L02S device found! Name: ");
+      DVL_PRINTLN(advertisedDevice->getName().c_str());
+      DVL_PRINT("RSSI: ");
+      DVL_PRINTLN(advertisedDevice->getRSSI());
 
       MokoSensorData _tempData;
       _tempData.valid = true;
@@ -190,8 +191,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
           hexData += String(output);
         }
         _tempData.rawHex = hexData;
-        Serial.print("Raw Hex Data: ");
-        Serial.println(hexData);
+        DVL_PRINT("Raw Hex Data: ");
+        DVL_PRINTLN(hexData);
 
         // MOKO L02S Parsing Logic (Tentativo)
         // Se asume el formato: [0-1] CompanyID, [u] Battery, [u][u] Temp,
@@ -212,7 +213,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
           uint16_t humRaw = ((uint8_t)data[5] << 8) | (uint8_t)data[6];
           _tempData.humidity = humRaw / 100.0;
 
-          Serial.printf("Parsed -> Temp: %.2f C, Hum: %.2f %%, Batt: %d %%\n",
+          DVL_PRINTF("Parsed -> Temp: %.2f C, Hum: %.2f %%, Batt: %d %%\n",
                         _tempData.temperature, _tempData.humidity, (int)batt);
         }
 
@@ -234,7 +235,7 @@ void BLEMokoScanner::begin() {
   if (_initialized) {
     return;
   }
-  Serial.println("Inicializando NimBLE...");
+  DVL_PRINTLN("Inicializando NimBLE...");
   NimBLEDevice::init("LILY-GO-BLE");
   pBLEScan = NimBLEDevice::getScan();
   pBLEScan->setScanCallbacks(new MyAdvertisedDeviceCallbacks());
@@ -254,14 +255,14 @@ void BLEMokoScanner::loop() {
   unsigned long now = millis();
   if (now - lastScanTime > SCAN_INTERVAL) {
     lastScanTime = now;
-    Serial.println("Iniciando escaneo NimBLE...");
+    DVL_PRINTLN("Iniciando escaneo NimBLE...");
     _foundDevice = false; // Reset for this scan
     _tempDataList.clear(); // Limpiar la lista de dispisitivos detectados en iteraciones previas
 
     // Explicitly pass 'false' to ensure we pick the synchronous overload
     // returning results start(duration, is_continue)
     if (pBLEScan != nullptr) {
-      Serial.println(">> pBLEScan->start(5000, false)...");
+      DVL_PRINTLN(">> pBLEScan->start(5000, false)...");
       if (pBLEScan->start(
               SCAN_DURATION * 1000,
               false)) { // NimBLE uses ms usually, but check overloaded version
@@ -273,21 +274,21 @@ void BLEMokoScanner::loop() {
 #endif
         }
       } else {
-        Serial.println("Fallo al iniciar pBLEScan->start()");
+        DVL_PRINTLN("Fallo al iniciar pBLEScan->start()");
       }
 
       NimBLEScanResults results = pBLEScan->getResults();
-      Serial.print("Dispositivos encontrados: ");
-      Serial.println(results.getCount());
+      DVL_PRINT("Dispositivos encontrados: ");
+      DVL_PRINTLN(results.getCount());
     } else {
-      Serial.println("Error: pBLEScan es nulo");
+      DVL_PRINTLN("Error: pBLEScan es nulo");
       return;
     }
 
     if (_foundDevice && _tempDataList.size() > 0) {
       latestData = _tempDataList;
       newDataAvailable = true;
-      Serial.println("Datos de sensor actualizados (" + String(latestData.size()) + " dispositivos).");
+      DVL_PRINTLN("Datos de sensor actualizados (" + String(latestData.size()) + " dispositivos).");
     }
 
     pBLEScan->clearResults();

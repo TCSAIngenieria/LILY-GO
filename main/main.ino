@@ -16,6 +16,7 @@
 #include <WiFi.h>
 
 #include "ADC.h"
+#include "Debug.h"
 #include "BLE_MOKO.h"
 #include "Comandos.h"
 #include "DS18B20.h"
@@ -48,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.02.05";
+String versionado = "V02.02.06";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -228,8 +229,8 @@ void setup() {
   ident = leer_de_flash("ident", "60000");
 
   topic1 = "DVL/LILY-GO/" + ident;
-  Serial.print("TOPIC MQTT: ");
-  Serial.println(topic1);
+  DVL_PRINT("TOPIC MQTT: ");
+  DVL_PRINTLN(topic1);
 
   /*CONFIGURACIoN WEB SERVER ADMIN*/
   preferences.begin("mqtt", true);
@@ -239,10 +240,10 @@ void setup() {
   preferences.end();
 
   /*BROKER MQTT*/
-  Serial.print("Broker cargado: ");
-  Serial.print(MQTT_BROKER);
-  Serial.print("  Puerto: ");
-  Serial.println(MQTT_PORT);
+  DVL_PRINT("Broker cargado: ");
+  DVL_PRINT(MQTT_BROKER);
+  DVL_PRINT("  Puerto: ");
+  DVL_PRINTLN(MQTT_PORT);
 
   /*CONFIGURACION WIFI*/
   preferences.begin("wifi", true);
@@ -311,7 +312,7 @@ void loop() {
       buttonPressStartTime = now;
       buttonWasPressed = true;
     } else if (now - buttonPressStartTime >= BUTTON_PRESS_TIME) {
-      Serial.println(
+      DVL_PRINTLN(
           "Boton presionado 5 segundos. Entrando en modo configuracion...");
       mqtt.disconnect();
       WiFi.disconnect(true); // Borra configuracion WiFi
@@ -336,7 +337,7 @@ void loop() {
 
   // ========== FASE GPS ==========
   if (faseGPS) {
-    Serial.println("Entrando a fase GPS bloqueante");
+    DVL_PRINTLN("Entrando a fase GPS bloqueante");
     // Encendemos GPS si no esta encendido
     enableGPS();
     float lat, lon;
@@ -359,9 +360,9 @@ void loop() {
         ultimaLat = nuevaLat;
         ultimaLon = nuevaLon;
 
-        Serial.println("GPS FIX conseguido:");
-        Serial.println("Latitud actual: " + ultimaLat);
-        Serial.println("Longitud actual: " + ultimaLon);
+        DVL_PRINTLN("GPS FIX conseguido:");
+        DVL_PRINTLN("Latitud actual: " + ultimaLat);
+        DVL_PRINTLN("Longitud actual: " + ultimaLon);
 
         guardar_en_flash("lat", nuevaLat);
         guardar_en_flash("lon", nuevaLon);
@@ -386,30 +387,30 @@ void loop() {
     //---------------------------------------------------------------------//
 
     if (!modem.init()) {
-      Serial.println("Fallo en modem.init() luego de restart");
+      DVL_PRINTLN("Fallo en modem.init() luego de restart");
       contadorErroresModem++;
-      Serial.print("Contador de errores de modem: ");
-      Serial.println(contadorErroresModem);
+      DVL_PRINT("Contador de errores de modem: ");
+      DVL_PRINTLN(contadorErroresModem);
 
       if (contadorErroresModem >= limiteErroresModem) {
-        Serial.println("Se alcanzo el limite de errores. Reiniciando modem...");
+        DVL_PRINTLN("Se alcanzo el limite de errores. Reiniciando modem...");
         modemRestart(); // Reinicio completo del modem
         contadorErroresModem = 0;
         delay(3000);
 
         if (!modem.init()) {
-          Serial.println("Fallo tras reinicio forzado del modem.");
+          DVL_PRINTLN("Fallo tras reinicio forzado del modem.");
           // Si queres reiniciar toda la placa en este punto, podes hacer:
           ESP.restart();
         } else {
-          Serial.println("Modem recuperado.");
+          DVL_PRINTLN("Modem recuperado.");
           faseGPS = false;
           faseGPRS_WIFI = true;
           digitalWrite(LED_PIN, false);
         }
       }
     } else {
-      Serial.println("Modem iniciado.");
+      DVL_PRINTLN("Modem iniciado.");
       faseGPS = false;
       faseGPRS_WIFI = true;
       digitalWrite(LED_PIN, false);
@@ -420,12 +421,12 @@ void loop() {
   static unsigned long lastCheck = 0;
   if (millis() - lastCheck > 10000) { // cada 10 segundos
     if (TINY_GSM_USE_WIFI && WiFi.status() == WL_CONNECTED) {
-      Serial.println("Conectado por WiFi");
+      DVL_PRINTLN("Conectado por WiFi");
     } else if (TINY_GSM_USE_GPRS && modem.isNetworkConnected() &&
                modem.isGprsConnected()) {
-      Serial.println("Conectado por GPRS");
+      DVL_PRINTLN("Conectado por GPRS");
     } else {
-      Serial.println("No hay conexion activa");
+      DVL_PRINTLN("No hay conexion activa");
     }
     lastCheck = millis();
   }
@@ -450,14 +451,14 @@ void loop() {
       updateNetworkConnection(modem); // Conexion no bloqueante
 
       if (!modem.isGprsConnected()) {
-        Serial.println("Intentando conectar GPRS...");
+        DVL_PRINTLN("Intentando conectar GPRS...");
         if (modem.gprsConnect(apn, gprsUser, gprsPass)) {
-          Serial.println("GPRS conectado correctamente");
+          DVL_PRINTLN("GPRS conectado correctamente");
           // MQTT Broker setup
           mqtt.setServer(MQTT_BROKER.c_str(), 1883);
           mqtt.setCallback(mqttCallback);
         } else {
-          Serial.println("Fallo al conectar GPRS");
+          DVL_PRINTLN("Fallo al conectar GPRS");
         }
       }
 
@@ -470,7 +471,7 @@ void loop() {
             ultimaActualizacionNTP = now;
             // ... Utiliza la hora sincronizada ...
           } else {
-            Serial.println("Fallo la actualizacion de NTP");
+            DVL_PRINTLN("Fallo la actualizacion de NTP");
           }
         } else if (now - ultimaActualizacionNTP >= intervaloNTP) {
           if (updateClockFromNTP(modem)) {
@@ -495,7 +496,7 @@ void loop() {
     bleScanner.loop();
 
     if (bleScanner.hasNewData()) {
-      Serial.println("Detectados nuevos datos BLE, preparando envio MQTT...");
+      DVL_PRINTLN("Detectados nuevos datos BLE, preparando envio MQTT...");
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
@@ -515,11 +516,11 @@ void loop() {
           if (publish_mqtt_json(topicBLE, jsonBLE)) {
             mqttUltimaConexionOK = millis();
           } else {
-            Serial.println("Fallo al publicar BLE online");
+            DVL_PRINTLN("Fallo al publicar BLE online");
           }
         } else {
           flash_save_packet(jsonBLE.c_str());
-          Serial.println("MQTT desconectado. Datos BLE guardados en flash.");
+          DVL_PRINTLN("MQTT desconectado. Datos BLE guardados en flash.");
         }
       }
     }
@@ -573,13 +574,13 @@ void loop() {
       updateClockFromNTP_wifi();
     }
 
-    Serial.print("Dato sensor: ");
-    Serial.println(valorStr);
+    DVL_PRINT("Dato sensor: ");
+    DVL_PRINTLN(valorStr);
 
     unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
     if (en_sensor == 1) {
-      Serial.print("Sensor habilitado. Enviando dato por MQTT...");
+      DVL_PRINT("Sensor habilitado. Enviando dato por MQTT...");
 
       String topicSensor = topic1 + "/DS18B20";
 
@@ -590,7 +591,7 @@ void loop() {
       if (mqtt.connected()) {
 
         if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
-          Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
           if (publish_mqtt_json(topicSensor, jsonsensor)) {
             mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
@@ -600,15 +601,15 @@ void loop() {
       } else {
         flash_save_packet(jsonsensor.c_str());
 
-        Serial.println(mqtt.connected());
+        DVL_PRINTLN(mqtt.connected());
 
-        Serial.println(WiFi.status());
+        DVL_PRINTLN(WiFi.status());
       }
     }
 
     if (en_serial == 1) {
 
-      Serial.print("Serial habilitado. Enviando dato por MQTT...");
+      DVL_PRINT("Serial habilitado. Enviando dato por MQTT...");
 
       String topicSerial = topic1 + "/SERIAL";
 
@@ -623,7 +624,7 @@ void loop() {
       if (mqtt.connected()) {
 
         if (topicSerial.length() == 0 || jsonserial.length() == 0) {
-          Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
           if (publish_mqtt_json(topicSerial, jsonserial)) {
             mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
@@ -633,14 +634,14 @@ void loop() {
       } else {
 
         flash_save_packet(jsonserial.c_str());
-        Serial.println(mqtt.connected());
-        Serial.println(WiFi.status());
+        DVL_PRINTLN(mqtt.connected());
+        DVL_PRINTLN(WiFi.status());
       }
     }
 
     if (en_modbus == 1) {
 
-      Serial.print("Modbus habilitado. Enviando dato por MQTT...");
+      DVL_PRINT("Modbus habilitado. Enviando dato por MQTT...");
 
       unsigned long numPkt = obtener_y_avanzar_numero_paquete();
       String jsonmodbus = create_mqtt_json_modbus(
@@ -649,7 +650,7 @@ void loop() {
 
       if (mqtt.connected()) {
         if (topic1.length() == 0 || jsonmodbus.length() == 0) {
-          Serial.println(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
           if (publish_mqtt_json(topic1, jsonmodbus)) {
             mqttUltimaConexionOK = millis();
@@ -668,9 +669,9 @@ void loop() {
         for (const auto &data : bleDataList) {
           unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
-          Serial.print("BLE Data found. Temp: ");
-          Serial.print(data.temperature);
-          Serial.println(" Sending MQTT...");
+          DVL_PRINT("BLE Data found. Temp: ");
+          DVL_PRINT(data.temperature);
+          DVL_PRINTLN(" Sending MQTT...");
 
           // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>
           String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
@@ -694,7 +695,7 @@ void loop() {
     }
 
     if (en_adc == 1) {
-      Serial.print("ADC habilitado. Enviando reporte ADC...");
+      DVL_PRINT("ADC habilitado. Enviando reporte ADC...");
       String jsonadc = create_mqtt_json_adc(
           ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
 
@@ -723,7 +724,7 @@ void loop() {
   }
 
   if (mqttActivo && millis() - mqttUltimaConexionOK > MQTT_TIMEOUT) {
-    Serial.println("🕒 Tiempo sin reconexion MQTT superado. Reiniciando...");
+    DVL_PRINTLN("🕒 Tiempo sin reconexion MQTT superado. Reiniciando...");
     delay(1000);
     ESP.restart();
   }
@@ -798,24 +799,24 @@ unsigned long obtener_y_avanzar_numero_paquete() {
 
 void conectar_WiFi() {
 
-  Serial.println("Intentando conectar a WiFi guardada...");
+  DVL_PRINTLN("Intentando conectar a WiFi guardada...");
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid.c_str(), password.c_str());
 
   unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
     delay(500);
-    Serial.print(".");
+    DVL_PRINT(".");
     esp_task_wdt_reset();
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("Conectado a WiFi!");
+    DVL_PRINTLN("Conectado a WiFi!");
     wifiConfigurado = true;
     TINY_GSM_USE_WIFI = true;
     TINY_GSM_USE_GPRS = false;
   } else {
-    Serial.println("No se pudo conectar a WiFi. Esperando boton...");
+    DVL_PRINTLN("No se pudo conectar a WiFi. Esperando boton...");
     wifiConfigurado = false;
     TINY_GSM_USE_WIFI = false;
     TINY_GSM_USE_GPRS = true;
