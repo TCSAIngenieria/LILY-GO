@@ -16,10 +16,10 @@
 #include <WiFi.h>
 
 #include "ADC.h"
-#include "Debug.h"
 #include "BLE_MOKO.h"
 #include "Comandos.h"
 #include "DS18B20.h"
+#include "Debug.h"
 #include "FOTA.h"
 #include "Fechayhora.h"
 #include "Flash.h"
@@ -29,6 +29,7 @@
 #include "Modbus.h"
 #include "SerialSecundario.h"
 #include "WebServerConfig.h"
+
 
 #ifdef DUMP_AT_COMMANDS
 #include <StreamDebugger.h>
@@ -49,7 +50,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.02.06";
+String versionado = "V02.03.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -263,7 +264,7 @@ void setup() {
   /*Configuracion MQTT*/
   mqtt.setSocketTimeout(60); // Espera hasta 60 segundos para conectarse
   mqtt.setKeepAlive(60); // Envia un ping cada 60 segundos si no hay actividad
-  mqtt.setBufferSize(512);
+  mqtt.setBufferSize(1024);
   mqtt.setServer(MQTT_BROKER.c_str(), MQTT_PORT);
   mqtt.setCallback(mqttCallback);
 
@@ -500,17 +501,35 @@ void loop() {
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
-        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
+        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
+        switch (bleData.frameType) {
+        case 0x40:
+          topicBLE += "/Device_Info";
+          break;
+        case 0x50:
+          topicBLE += "/iBeacon";
+          break;
+        case 0x60:
+          topicBLE += "/3-axis_Acc";
+          break;
+        case 0x70:
+          topicBLE += "/T_and_H";
+          break;
+        default:
+          if (bleData.frameType != 0) {
+            char ftBuf[10];
+            sprintf(ftBuf, "/0x%02X", bleData.frameType);
+            topicBLE += String(ftBuf);
+          }
+          break;
+        }
 
         unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
         String jsonBLE = create_mqtt_json_ble(
-            topicBLE, ident, printCurrentTime(), bleData.name,
-            bleData.temperature, bleData.humidity, bleData.batteryLevel,
-            bleData.accelX, bleData.accelY, bleData.accelZ, bleData.tag_id,
-            bleData.uuid, ultimaLat, ultimaLon, leer_tension_bateria(),
-            leer_tension_principal(), numPkt, bleData.motion, bleData.door);
+            topicBLE, ident, printCurrentTime(), bleData, ultimaLat, ultimaLon,
+            leer_tension_bateria(), leer_tension_principal(), numPkt);
 
         if (mqtt.connected()) {
           if (publish_mqtt_json(topicBLE, jsonBLE)) {
@@ -673,15 +692,33 @@ void loop() {
           DVL_PRINT(data.temperature);
           DVL_PRINTLN(" Sending MQTT...");
 
-          // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>
+          // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
           String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
+          switch (data.frameType) {
+          case 0x40:
+            topicBLE += "/Device_Info";
+            break;
+          case 0x50:
+            topicBLE += "/iBeacon";
+            break;
+          case 0x60:
+            topicBLE += "/3-axis_Acc";
+            break;
+          case 0x70:
+            topicBLE += "/T_and_H";
+            break;
+          default:
+            if (data.frameType != 0) {
+              char ftBuf[10];
+              sprintf(ftBuf, "/0x%02X", data.frameType);
+              topicBLE += String(ftBuf);
+            }
+            break;
+          }
 
           String jsonble = create_mqtt_json_ble(
-              topicBLE, ident, printCurrentTime(), data.name, data.temperature,
-              data.humidity, data.batteryLevel, data.accelX, data.accelY,
-              data.accelZ, data.tag_id, data.uuid, ultimaLat, ultimaLon,
-              leer_tension_bateria(), leer_tension_principal(), numPkt,
-              data.motion, data.door);
+              topicBLE, ident, printCurrentTime(), data, ultimaLat, ultimaLon,
+              leer_tension_bateria(), leer_tension_principal(), numPkt);
 
           if (mqtt.connected()) {
             if (publish_mqtt_json(topicBLE, jsonble)) {

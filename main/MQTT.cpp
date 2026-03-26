@@ -231,28 +231,73 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
 }
 
 String create_mqtt_json_ble(String topic, String ident, String fechayhora,
-                            String name, float temp, float hum,
-                            int batteryLevel, float accelX, float accelY,
-                            float accelZ, String tag_id, String uuid,
+                            const MokoSensorData& data,
                             String latitud, String longitud, float Vbateria,
-                            float Vprincipal, unsigned long numeroPaquete,
-                            int motion, int door) {
-  StaticJsonDocument<512> doc;
-  doc["name"] = name;
-  doc["tag_id"] = tag_id;
-  doc["UUID"] = uuid;
+                            float Vprincipal, unsigned long numeroPaquete) {
+  StaticJsonDocument<2048> doc;
+  
+  if (data.name.length() > 0) doc["name"] = data.name;
+  if (data.tag_id.length() > 0) doc["tag_id"] = data.tag_id;
+  if (data.uuid.length() > 0) doc["UUID"] = data.uuid;
+  
   doc["date"] = fechayhora;
-  doc["temp"] = String(temp, 2);
-  doc["hum"] = String(hum, 2);
-  doc["mov"] = motion;
-  doc["door"] = door;
-  doc["% bat"] = batteryLevel;
-  doc["Accel_X"] = accelX;
-  doc["Accel_Y"] = accelY;
-  doc["Accel_Z"] = accelZ;
   doc["index"] = numeroPaquete;
+  
+  if (data.rawHex.length() > 0) doc["rawHex"] = data.rawHex;
 
-  char payload[512];
+  if (data.frameType != 0) {
+    char ftBuf[5];
+    sprintf(ftBuf, "0x%02X", data.frameType);
+    doc["frame_type"] = String(ftBuf);
+  }
+
+  // Common or historically present fields (L02S, PaPeR, H4Pro general)
+  if (data.batteryLevel > 0) doc["% bat"] = data.batteryLevel;
+  if (data.rangingData != 0) doc["ranging"] = data.rangingData;
+  if (data.advInterval > 0) doc["adv_int"] = data.advInterval;
+  if (data.deviceType != 0) doc["dev_type"] = data.deviceType;
+  if (data.motion > 0) doc["mov"] = data.motion;
+  if (data.door > 0) doc["door"] = data.door;
+
+  // Frame-specific conditional additions
+  switch (data.frameType) {
+    case 0x40:
+      doc["dev_prop"] = data.deviceProperty;
+      doc["sw_status"] = data.switchStatus;
+      doc["firmware"] = data.firmwareVersion;
+      break;
+    case 0x50:
+      doc["ibeacon_uuid"] = data.ibeaconUuid;
+      doc["major"] = data.major;
+      doc["minor"] = data.minor;
+      doc["rssi1m"] = data.rssi1m;
+      break;
+    case 0x60:
+      doc["samp_rate"] = data.samplingRate;
+      doc["full_scale"] = data.fullScale;
+      doc["motion_thr"] = data.motionThresh;
+      // Acceleration is kept outside the switch so other sensors can use it too
+      break;
+    case 0x70:
+      doc["temp"] = String(data.temperature, 2);
+      doc["hum"] = String(data.humidity, 2);
+      break;
+    default:
+      // If no specific MOKO frame type is set, it might be an older sensor
+      // that relies on these globals. Add them if they're populated.
+      if (data.temperature != 0.0) doc["temp"] = String(data.temperature, 2);
+      if (data.humidity != 0.0) doc["hum"] = String(data.humidity, 2);
+      break;
+  }
+
+  // Universal check for acceleration (used by 0x60 and other legacy tags)
+  if (data.accelX != 0 || data.accelY != 0 || data.accelZ != 0) {
+    doc["Accel_X"] = data.accelX;
+    doc["Accel_Y"] = data.accelY;
+    doc["Accel_Z"] = data.accelZ;
+  }
+
+  char payload[2048];
   serializeJson(doc, payload);
   return String(payload);
 }
