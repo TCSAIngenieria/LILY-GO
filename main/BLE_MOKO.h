@@ -8,26 +8,39 @@
 #include <NimBLEDevice.h>
 #include <NimBLEScan.h>
 #include <NimBLEUtils.h>
-
 #include <vector>
 
 struct MokoSensorData {
-  bool valid;
-  String name;
-  String mac;
-  int rssi;
-  float temperature;
-  float humidity;
-  int batteryLevel;
-  float accelX;
-  float accelY;
-  float accelZ;
-  String rawHex;
-  uint8_t motion;
-  uint8_t door;
-  String tag_id;
-  String uuid;
-  unsigned long lastUpdate;
+  bool valid = false;
+  String name = "";
+  String mac = "";
+  int rssi = 0;
+  float temperature = 0.0;
+  float humidity = 0.0;
+  int batteryLevel = 0;
+  int rangingData = 0;
+  int advInterval = 0;
+  int deviceType = 0;
+  uint8_t frameType = 0;
+  uint8_t deviceProperty = 0;
+  uint8_t switchStatus = 0;
+  String firmwareVersion = "";
+  String ibeaconUuid = "";
+  uint16_t major = 0;
+  uint16_t minor = 0;
+  int8_t rssi1m = 0;
+  uint8_t samplingRate = 0;
+  uint8_t fullScale = 0;
+  uint8_t motionThresh = 0;
+  float accelX = 0;
+  float accelY = 0;
+  float accelZ = 0;
+  String rawHex = "";
+  uint8_t motion = 0;
+  uint8_t door = 0;
+  String tag_id = "";
+  String uuid = "";
+  unsigned long lastUpdate = 0;
 };
 
 class BLEMokoScanner {
@@ -35,14 +48,12 @@ public:
   BLEMokoScanner();
   void begin();
   void loop();
-  // Devuelve true si sacó un dato de la cola, false si vacía
-  bool getNextDevice(MokoSensorData *data);
+  std::vector<MokoSensorData> getLatestData();
   bool hasNewData();
 
 private:
   NimBLEScan *pBLEScan;
-  // Cola de dispositivos encontrados en el ultimo scan
-  std::vector<MokoSensorData> deviceQueue;
+  std::vector<MokoSensorData> latestData;
   bool newDataAvailable;
   unsigned long lastScanTime;
   const unsigned long SCAN_INTERVAL = 30000; // Scan every 30 seconds

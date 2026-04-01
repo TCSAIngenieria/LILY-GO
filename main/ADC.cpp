@@ -1,4 +1,5 @@
 #include "ADC.h"
+#include "Debug.h"
 #include <Preferences.h>
 
 #define ADC_PIN_BAT 34 // Ejemplo pin ADC para bateria (18650)
@@ -53,9 +54,9 @@ float leer_tension_bateria() {
   // Ajuste por divisor resistivo: si 4.2V reales ⇒ 1.6V leidos
   float batteryVoltage = raw * (4.2 / 2.56);
 
-  Serial.print("Voltaje bateria estimado (18650): ");
-  Serial.print(batteryVoltage);
-  Serial.println(" V");
+  DVL_PRINT("Voltaje bateria estimado (18650): ");
+  DVL_PRINT(batteryVoltage);
+  DVL_PRINTLN(" V");
 
   return batteryVoltage;
 }
@@ -67,10 +68,10 @@ float leer_tension_principal() {
 
   // Si la bateria esta bien cargada (>4V reales aprox.)
   if (batteryVoltage > 4) {
-    Serial.println("Alimentacion principal estimada: 5.0 V");
+    DVL_PRINTLN("Alimentacion principal estimada: 5.0 V");
     return 5.0;
   } else {
-    Serial.println("Alimentacion principal estimada: 0.0 V");
+    DVL_PRINTLN("Alimentacion principal estimada: 0.0 V");
     return 0.0;
   }
 }

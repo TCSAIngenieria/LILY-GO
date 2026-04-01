@@ -1,4 +1,5 @@
 #include "DS18B20.h"
+#include "Debug.h"
 #include <Arduino.h>
 
 DS18B20::DS18B20()
@@ -15,17 +16,17 @@ void DS18B20::initSensor() {
 
   sensors.begin();
   if (!sensors.getAddress(address, 0)) {
-    Serial.println(" No se encontro el sensor DS18B20.");
+    DVL_PRINTLN(" No se encontro el sensor DS18B20.");
     sensorEncontrado = false;
   } else {
-    Serial.println(" Sensor DS18B20 encontrado.");
+    DVL_PRINTLN(" Sensor DS18B20 encontrado.");
     sensorEncontrado = true;
   }
 }
 
 float DS18B20::readValue() {
   if (!sensorEncontrado) {
-    Serial.println(" Sensor no detectado. Reiniciando...");
+    DVL_PRINTLN(" Sensor no detectado. Reiniciando...");
     return -999.0;
   }
 
@@ -33,8 +34,8 @@ float DS18B20::readValue() {
   float temp = sensors.getTempCByIndex(0);
 
   // Controla que la lectura no sea error por desconexion o valores invalidos tipicos
-  if (temp == DEVICE_DISCONNECTED_C || temp == -127.0 || temp < -55.0 || temp > 85.0) {
-    Serial.println(" Error leyendo la temperatura. Devolviendo ultima valida.");
+  if (temp == DEVICE_DISCONNECTED_C || temp == -127.0 || temp < -20.0 || temp > 50.0) {
+    DVL_PRINTLN(" Error leyendo la temperatura. Devolviendo ultima valida.");
     return ultimaTempValida;
   } else {
     // Actualiza ultima valida solo si cambio mas de 0.01 grados
@@ -56,7 +57,7 @@ void DS18B20::loop() {
   switch (estadoReinicio) {
     case IDLE:
       if ((now - tiempoUltimoCambio > SENSOR_TIEMPO_MAX_IGUAL) || ultimaTempValida == -127.0 || ultimaTempValida == -999.0) {
-        Serial.println("🔁 Reiniciando sensor DS18B20...");
+        DVL_PRINTLN("🔁 Reiniciando sensor DS18B20...");
         digitalWrite(SENSOR_POWER_PIN, LOW);
         tiempoReinicio = now;
         estadoReinicio = APAGADO;
@@ -64,7 +65,7 @@ void DS18B20::loop() {
       break;
 
     case APAGADO:
-      if (now - tiempoReinicio > 1000) {
+      if (now - tiempoReinicio > 5000) {
         digitalWrite(SENSOR_POWER_PIN, HIGH);
         tiempoReinicio = now;
         estadoReinicio = ENCENDIDO;
@@ -72,8 +73,8 @@ void DS18B20::loop() {
       break;
 
     case ENCENDIDO:
-      if (now - tiempoReinicio > 500) {
-        Serial.println(" Sonda DS18B20 reiniciada.");
+      if (now - tiempoReinicio > 2000) {
+        DVL_PRINTLN(" Sonda DS18B20 reiniciada.");
         tiempoUltimoCambio = now;
         initSensor();
         estadoReinicio = IDLE;

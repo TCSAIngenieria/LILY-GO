@@ -1,4 +1,5 @@
 #include "Flash.h"
+#include "Debug.h"
 #include <Preferences.h>
 #include <SPIFFS.h>
 
@@ -23,7 +24,7 @@ static bool packetLoaded = false;
 
 void lectura_flash() {
   
-  Serial.println("Leyendo datos almacenados en flash...");
+  DVL_PRINTLN("Leyendo datos almacenados en flash...");
 
   ultimaLat = leer_de_flash("lat");
   ultimaLon = leer_de_flash("lon");
@@ -35,25 +36,25 @@ void lectura_flash() {
     }
   }
 
-  Serial.print("ultima Latitud guardada: ");
-  Serial.println(ultimaLat);
-  Serial.print("ultima Longitud guardada: ");
-  Serial.println(ultimaLon);
-  Serial.print("ultima ultimo publish_time guardado: ");
-  Serial.println(spublishInterval);
-  Serial.print(publishInterval);
+  DVL_PRINT("ultima Latitud guardada: ");
+  DVL_PRINTLN(ultimaLat);
+  DVL_PRINT("ultima Longitud guardada: ");
+  DVL_PRINTLN(ultimaLon);
+  DVL_PRINT("ultima ultimo publish_time guardado: ");
+  DVL_PRINTLN(spublishInterval);
+  DVL_PRINT(publishInterval);
 }
 
 void guardar_en_flash(const String& clave, const String& valor) {
   if (prefs.begin("gps_data", false)) {
     prefs.putString(clave.c_str(), valor);
     prefs.end();
-    Serial.print("Guardado en flash → ");
-    Serial.print(clave);
-    Serial.print(": ");
-    Serial.println(valor);
+    DVL_PRINT("Guardado en flash → ");
+    DVL_PRINT(clave);
+    DVL_PRINT(": ");
+    DVL_PRINTLN(valor);
   } else {
-    Serial.println("No se pudo abrir la NVS para escritura.");
+    DVL_PRINTLN("No se pudo abrir la NVS para escritura.");
   }
 }
 
@@ -63,7 +64,7 @@ String leer_de_flash(const String& clave, const String& valorPorDefecto) {
     resultado = prefs.getString(clave.c_str(), valorPorDefecto);
     prefs.end();
   } else {
-    Serial.println("No se pudo abrir la NVS para lectura.");
+    DVL_PRINTLN("No se pudo abrir la NVS para lectura.");
   }
   return resultado;
 }
@@ -71,7 +72,7 @@ String leer_de_flash(const String& clave, const String& valorPorDefecto) {
 void flash_init() {
   // Iniciar SPIFFS
   if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
-    Serial.println("Error mount SPIFFS");
+    DVL_PRINTLN("Error mount SPIFFS");
   }
   // Iniciar Preferences
   if (prefs.begin("flash_buf", true)) {  // lectura
@@ -79,7 +80,7 @@ void flash_init() {
     readIndex = prefs.getInt("ridx", 0);
     prefs.end();
   } else {
-    Serial.println("No pudo abrir Preferences");
+    DVL_PRINTLN("No pudo abrir Preferences");
   }
 }
 
@@ -96,7 +97,7 @@ bool flash_save_packet(const char* json) {
   if (flash_buffer_full()) {
     // Si esta lleno, adelanta readIndex para "pisar" el paquete mas viejo
     readIndex = (readIndex + 1) % MAX_PACKETS;
-    Serial.println(" Buffer lleno, se sobrescribira el paquete mas viejo");
+    DVL_PRINTLN(" Buffer lleno, se sobrescribira el paquete mas viejo");
   }
 
   // Guardar json en SPIFFS en archivo packet_writeIndex.json
@@ -105,7 +106,7 @@ bool flash_save_packet(const char* json) {
 
   File f = SPIFFS.open(filename, FILE_WRITE);
   if (!f) {
-    Serial.println("Error al abrir archivo para guardar paquete");
+    DVL_PRINTLN("Error al abrir archivo para guardar paquete");
     return false;
   }
   f.write((const uint8_t*)json, strlen(json));
@@ -120,7 +121,7 @@ bool flash_save_packet(const char* json) {
     prefs.end();
   }
 
-  Serial.printf("Guardado paquete en flash index=%d\n", (writeIndex == 0) ? MAX_PACKETS - 1 : writeIndex - 1);
+  DVL_PRINTF("Guardado paquete en flash index=%d\n", (writeIndex == 0) ? MAX_PACKETS - 1 : writeIndex - 1);
   return true;
 }
 
@@ -134,12 +135,12 @@ const char* flash_get_next_packet() {
 
   File f = SPIFFS.open(filename, FILE_READ);
   if (!f) {
-    Serial.println("Error abriendo archivo para leer paquete");
+    DVL_PRINTLN("Error abriendo archivo para leer paquete");
     return nullptr;
   }
   size_t len = f.size();
   if (len >= MAX_PACKET_SIZE) {
-    Serial.println("Paquete demasiado grande");
+    DVL_PRINTLN("Paquete demasiado grande");
     f.close();
     return nullptr;
   }
@@ -168,5 +169,5 @@ void flash_mark_packet_sent() {
     prefs.end();
   }
 
-  Serial.printf("Paquete indice %d marcado como enviado\n", (readIndex == 0) ? MAX_PACKETS - 1 : readIndex - 1);
+  DVL_PRINTF("Paquete indice %d marcado como enviado\n", (readIndex == 0) ? MAX_PACKETS - 1 : readIndex - 1);
 }

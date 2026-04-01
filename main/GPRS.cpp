@@ -1,4 +1,5 @@
 #include "GPRS.h"
+#include "Debug.h"
 #include <time.h>
 #include <sys/time.h>
 
@@ -39,14 +40,14 @@ void modemRestart() {
 }
 
 void initSD() {
-  Serial.println("========SDCard Detect.======");
+  DVL_PRINTLN("========SDCard Detect.======");
   SPI.begin(SD_SCLK, SD_MISO, SD_MOSI);
   if (!SD.begin(SD_CS)) {
-    Serial.println("SDCard MOUNT FAIL");
+    DVL_PRINTLN("SDCard MOUNT FAIL");
   } else {
     uint32_t cardSize = SD.cardSize() / (1024 * 1024);
     String str = "SDCard Size: " + String(cardSize) + "MB";
-    Serial.println(str);
+    DVL_PRINTLN(str);
   }
 }
 
@@ -55,47 +56,47 @@ void printModemInfo(TinyGsm &modem, String &res) {
   //"========SIMCOMATI======"
   modem.sendAT("+SIMCOMATI");
   modem.waitResponse(1000L, res);
-  Serial.println(res);
+  DVL_PRINTLN(res);
   res = "";
 
   //=====Preferred mode selection====="
   modem.sendAT("+CNMP?");
   if (modem.waitResponse(1000L, res) == 1) {
-    Serial.println(res);
+    DVL_PRINTLN(res);
   }
   res = "";
 
   //=====Preferred selection between CAT-M and NB-IoT====="
   modem.sendAT("+CMNB?");
   if (modem.waitResponse(1000L, res) == 1) {
-    Serial.println(res);
+    DVL_PRINTLN(res);
   }
   res = "";
 
   //=====Inquiring UE system information====="
   modem.sendAT("+CPSI?");
   if (modem.waitResponse(1000L, res) == 1) {
-    Serial.println(res);
+    DVL_PRINTLN(res);
   }
   res = "";
 }
 
 bool updateClockFromNTP(TinyGsm &modem) {
   String res;
-  Serial.println("[NTP] Solicitando sincronizacion...");
+  DVL_PRINTLN("[NTP] Solicitando sincronizacion...");
   modem.sendAT("AT+CNTP=\"pool.ntp.org\",0");
   if (modem.waitResponse(1000L, res) == 1) {
-    Serial.println(res);
+    DVL_PRINTLN(res);
   }
   res = "";
 
   delay(2000);  // Espera para que la hora se actualice en el modem
 
-  Serial.println("[NTP] Leyendo hora desde el modem...");
+  DVL_PRINTLN("[NTP] Leyendo hora desde el modem...");
   modem.sendAT("+CCLK?");
 
   if (modem.waitResponse(1000L, res) == 1) {
-    Serial.println(res);
+    DVL_PRINTLN(res);
   }
 
   int index = res.indexOf("+CCLK:");
@@ -104,15 +105,15 @@ bool updateClockFromNTP(TinyGsm &modem) {
     int end = res.indexOf("\"", start + 1);
     if (start != -1 && end != -1) {
       String clockStr = res.substring(start, end + 1);  // ej: "25/06/03,10:28:55+00"
-      Serial.println("[NTP] Hora obtenida:");
-      Serial.println(clockStr);
+      DVL_PRINTLN("[NTP] Hora obtenida:");
+      DVL_PRINTLN(clockStr);
       updateInternalClock(clockStr);
       res = "";
       return true;
     }
   } else {
 
-    Serial.println("[NTP] No se pudo parsear la hora del modem");
+    DVL_PRINTLN("[NTP] No se pudo parsear la hora del modem");
     return false;
   }
 }
@@ -136,10 +137,10 @@ void updateInternalClock(String clockString) {
     struct timeval now = { .tv_sec = t };
     settimeofday(&now, NULL);
 
-    Serial.println("[RTC] Reloj interno actualizado:");
-    Serial.println(ctime(&t));
+    DVL_PRINTLN("[RTC] Reloj interno actualizado:");
+    DVL_PRINTLN(ctime(&t));
   } else {
-    Serial.println("[RTC] Error al parsear +CCLK");
+    DVL_PRINTLN("[RTC] Error al parsear +CCLK");
   }
 }
 
@@ -150,7 +151,7 @@ void updateNetworkConnection(TinyGsm &modem) {
   if (!isModemReady) {
     isModemReady = modem.init();
     if (!isModemReady) {
-      Serial.println("Modem init failed");
+      DVL_PRINTLN("Modem init failed");
       return;
     }
   }
@@ -168,10 +169,10 @@ void updateNetworkConnection(TinyGsm &modem) {
   delay(1000);
   isModemConnected = modem.isNetworkConnected();
 
-  Serial.print("Modo conexion: ");
-  Serial.print(networkModes[currentModeIndex]);
-  Serial.print(" - Conectado? ");
-  Serial.println(isModemConnected ? "SI" : "NO");
+  DVL_PRINT("Modo conexion: ");
+  DVL_PRINT(networkModes[currentModeIndex]);
+  DVL_PRINT(" - Conectado? ");
+  DVL_PRINTLN(isModemConnected ? "SI" : "NO");
 
   if (!isModemConnected) {
     currentModeIndex = (currentModeIndex + 1) % 3;  // Cambia al siguiente modo

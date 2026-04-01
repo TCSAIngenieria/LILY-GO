@@ -1,4 +1,5 @@
 #include "MQTT.h"
+#include "Debug.h"
 #include "Comandos.h"
 #include "FOTA.h"
 #include "Modbus.h"
@@ -27,11 +28,11 @@ String MQTT_BROKER = "192.168.7.252"; // Valor por defecto
 int MQTT_PORT = 7183;                 // Valor por defecto
 
 boolean mqttConnect() {
-  Serial.print("Conectando a MQTT broker: ");
-  Serial.println(MQTT_BROKER);
+  DVL_PRINT("Conectando a MQTT broker: ");
+  DVL_PRINTLN(MQTT_BROKER);
 
   if (mqtt.connect(ident.c_str())) {
-    Serial.println(" Conectado a MQTT!");
+    DVL_PRINTLN(" Conectado a MQTT!");
     mqttActivo = true;
     mqttUltimaConexionOK = millis();
 
@@ -41,12 +42,12 @@ boolean mqttConnect() {
     mqtt.subscribe(topicFOTA.c_str());
     mqtt.subscribe(topicCMD.c_str());
 
-    Serial.println("📡 Suscripto a topics FOTA y COMANDOS");
+    DVL_PRINTLN("📡 Suscripto a topics FOTA y COMANDOS");
     esp_task_wdt_reset();
     return true;
   } else {
-    Serial.print(" Error al conectar a MQTT. Codigo: ");
-    Serial.println(mqtt.state());
+    DVL_PRINT(" Error al conectar a MQTT. Codigo: ");
+    DVL_PRINTLN(mqtt.state());
     esp_task_wdt_reset();
     return false;
   }
@@ -71,16 +72,16 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
     preferences.end();
 
     if (storedURL != message) {
-      Serial.println(" Nueva URL FOTA detectada. Iniciando actualizacion...");
+      DVL_PRINTLN(" Nueva URL FOTA detectada. Iniciando actualizacion...");
       FOTA.startUpdate(message);
     } else {
-      Serial.println("URL FOTA igual a la actual. Ignorando.");
+      DVL_PRINTLN("URL FOTA igual a la actual. Ignorando.");
     }
   }
 
   // COMANDOS
   else if (topicStr.endsWith("/COMANDOS")) {
-    Serial.println(" Comando MQTT recibido: " + message);
+    DVL_PRINTLN(" Comando MQTT recibido: " + message);
 
     // Construir topic de respuesta
     String topicRespuesta = "DVL/LILY-GO/" + ident + "/RESPUESTA";
@@ -93,36 +94,34 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
   }
 
   else {
-    Serial.println(" Topico MQTT no manejado: " + topicStr);
+    DVL_PRINTLN(" Topico MQTT no manejado: " + topicStr);
   }
 }
 
 bool publish_mqtt_json(String topic, String jsonPayload) {
   if (!mqtt.connected()) {
-    Serial.println("MQTT no conectado, no se puede publicar.");
+    DVL_PRINTLN("MQTT no conectado, no se puede publicar.");
     return false;
   }
 
   bool sent = mqtt.publish(topic.c_str(), jsonPayload.c_str());
-  Serial.print("Publicado JSON en topic ");
-  Serial.print(topic);
-  Serial.print(": ");
-  Serial.println(sent ? "OK" : "FALLo");
-  Serial.println(jsonPayload); // Para debug: imprime el JSON publicado
+  DVL_PRINT("Publicado JSON en topic ");
+  DVL_PRINT(topic);
+  DVL_PRINT(": ");
+  DVL_PRINTLN(sent ? "OK" : "FALLo");
+  DVL_PRINTLN(jsonPayload); // Para debug: imprime el JSON publicado
 
   return sent;
 }
 
 String create_mqtt_json_sensor(String topic, String ident,
                                String valor_variable, String fechayhora,
-                               String latitud, String longitud, float Vbateria,
+                               float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<256> doc;
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
   doc["date"] = fechayhora;
-  doc["latitud"] = latitud;
-  doc["longitud"] = longitud;
   doc["Tension_bateria"] = Vbateria;
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
@@ -214,43 +213,91 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
 }
 
 String create_mqtt_json_keepalive(String ident, String fechayhora,
+                                  String latitud, String longitud,
                                   String versionado,
                                   unsigned long rebootCount) {
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<256> doc;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
+  doc["latitud"] = latitud;
+  doc["longitud"] = longitud;
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
 
-  char payload[128];
+  char payload[256];
   serializeJson(doc, payload);
   return String(payload);
 }
 
 String create_mqtt_json_ble(String topic, String ident, String fechayhora,
-                            String name, float temp, float hum,
-                            int batteryLevel, float accelX, float accelY,
-                            float accelZ, String tag_id, String uuid,
+                            const MokoSensorData& data,
                             String latitud, String longitud, float Vbateria,
-                            float Vprincipal, unsigned long numeroPaquete,
-                            int motion, int door) {
-  StaticJsonDocument<512> doc;
-  doc["name"] = name;
-  doc["tag_id"] = tag_id;
-  doc["UUID"] = uuid;
+                            float Vprincipal, unsigned long numeroPaquete) {
+  StaticJsonDocument<2048> doc;
+  
+  if (data.name.length() > 0) doc["name"] = data.name;
+  if (data.tag_id.length() > 0) doc["tag_id"] = data.tag_id;
+  if (data.uuid.length() > 0) doc["UUID"] = data.uuid;
+  
   doc["date"] = fechayhora;
-  doc["temp"] = String(temp, 2);
-  doc["hum"] = String(hum, 2);
-  doc["mov"] = motion;
-  doc["door"] = door;
-  doc["% bat"] = batteryLevel;
-  doc["Accel_X"] = accelX;
-  doc["Accel_Y"] = accelY;
-  doc["Accel_Z"] = accelZ;
   doc["index"] = numeroPaquete;
+  
+  if (data.rawHex.length() > 0) doc["rawHex"] = data.rawHex;
 
-  char payload[512];
+  if (data.frameType != 0) {
+    char ftBuf[5];
+    sprintf(ftBuf, "0x%02X", data.frameType);
+    doc["frame_type"] = String(ftBuf);
+  }
+
+  // Common or historically present fields (L02S, PaPeR, H4Pro general)
+  if (data.batteryLevel > 0) doc["% bat"] = data.batteryLevel;
+  if (data.rangingData != 0) doc["ranging"] = data.rangingData;
+  if (data.advInterval > 0) doc["adv_int"] = data.advInterval;
+  if (data.deviceType != 0) doc["dev_type"] = data.deviceType;
+  if (data.motion > 0) doc["mov"] = data.motion;
+  if (data.door > 0) doc["door"] = data.door;
+
+  // Frame-specific conditional additions
+  switch (data.frameType) {
+    case 0x40:
+      doc["dev_prop"] = data.deviceProperty;
+      doc["sw_status"] = data.switchStatus;
+      doc["firmware"] = data.firmwareVersion;
+      break;
+    case 0x50:
+      doc["ibeacon_uuid"] = data.ibeaconUuid;
+      doc["major"] = data.major;
+      doc["minor"] = data.minor;
+      doc["rssi1m"] = data.rssi1m;
+      break;
+    case 0x60:
+      doc["samp_rate"] = data.samplingRate;
+      doc["full_scale"] = data.fullScale;
+      doc["motion_thr"] = data.motionThresh;
+      // Acceleration is kept outside the switch so other sensors can use it too
+      break;
+    case 0x70:
+      doc["temp"] = String(data.temperature, 2);
+      doc["hum"] = String(data.humidity, 2);
+      break;
+    default:
+      // If no specific MOKO frame type is set, it might be an older sensor
+      // that relies on these globals. Add them if they're populated.
+      if (data.temperature != 0.0) doc["temp"] = String(data.temperature, 2);
+      if (data.humidity != 0.0) doc["hum"] = String(data.humidity, 2);
+      break;
+  }
+
+  // Universal check for acceleration (used by 0x60 and other legacy tags)
+  if (data.accelX != 0 || data.accelY != 0 || data.accelZ != 0) {
+    doc["Accel_X"] = data.accelX;
+    doc["Accel_Y"] = data.accelY;
+    doc["Accel_Z"] = data.accelZ;
+  }
+
+  char payload[2048];
   serializeJson(doc, payload);
   return String(payload);
 }
