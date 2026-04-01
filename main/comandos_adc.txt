@@ -1,0 +1,60 @@
+DOCUMENTACION DE COMANDOS ADC
+
+1. COMANDO SFIL (Set Filter)
+   - Descripción: Configura los parámetros del filtro para un canal ADC específico. Establece un valor mínimo (m) y un valor de reemplazo (p) si la lectura es menor o igual a ese mínimo.
+   - Sintaxis: DVL+SFIL=n,m,p
+   - Parámetros:
+     * n: Índice del canal ADC (0, 1 o 2).
+     * m: Valor umbral mínimo (float). Si la lectura es <= m, se aplica el filtro.
+     * p: Valor de reemplazo (float). Valor que tomará la lectura si es <= m.
+   - Ejemplo: DVL+SFIL=0,0.5,0.0
+     (Configura el canal 0: si la lectura es <= 0.5, el valor será 0.0)
+   - Respuesta Exitosa: FILTRO SETEADO OK
+   - Errores Posibles:
+     * ERROR: Indice fuera de rango (0-2)
+     * ERROR: Formato incorrecto (n,m,p)
+
+2. COMANDO SFACTOR (Set Factor)
+   - Descripción: Configura los parámetros de calibración lineal (pendiente y offset) para un canal ADC específico. La fórmula aplicada es: ValorFinal = (ValorLeido * m) + p.
+   - Sintaxis: DVL+SFACTOR=n,m,p
+   - Parámetros:
+     * n: Índice del canal ADC (0, 1 o 2).
+     * m: Factor multiplicativo o pendiente (float).
+     * p: Offset o desplazamiento (float).
+   - Ejemplo: DVL+SFACTOR=1,1.05,0.2
+     (Configura el canal 1: multiplica la lectura por 1.05 y suma 0.2)
+   - Respuesta Exitosa: FACTOR SETEADO OK
+   - Errores Posibles:
+     * ERROR: Indice fuera de rango (0-2)
+     * ERROR: Formato incorrecto (n,m,p)
+
+3. COMANDO SALI (Set Alisado)
+   - Descripción: Configura la cantidad de muestras utilizadas para el promedio móvil (alisado) de las lecturas del ADC.
+   - Sintaxis: DVL+SALI=val
+   - Parámetros:
+     * val: Número de muestras para el promedio (entero > 0).
+   - Ejemplo: DVL+SALI=50
+     (Establece que se promediarán las últimas 50 mediciones)
+   - Respuesta Exitosa: ALISADO SETEADO OK
+   - Errores Posibles:
+     * ERROR: Valor debe ser mayor a 0
+
+4. COMANDO STADC (Set Time ADC)
+   - Descripción: Configura el intervalo de tiempo para la toma de muestras del ADC. El valor se multiplica por 100ms.
+   - Sintaxis: DVL+STADC=val
+   - Parámetros:
+     * val: Valor entero entre 1 y 65000. (Ej: 1 = 100ms, 10 = 1s, 600 = 1min).
+   - Ejemplo: DVL+STADC=10
+     (Establece que se tomará una muestra cada 1 segundo)
+   - Respuesta Exitosa: TIME ADC SETEADO OK
+   - Errores Posibles:
+     * ERROR: Valor fuera de rango (1-65000)
+
+NOTAS ADICIONALES:
+- Los pines de ADC son los siguientes: ADC0->35, ADC1->36, ADC2->39
+- Todos los cambios realizados con estos comandos se guardan en la memoria no volátil (Preferences) y persisten tras reiniciar el dispositivo.
+- Para consultar los valores actuales se pueden usar los comandos:
+  * DVL+QFIL (Consulta filtros)
+  * DVL+QFACTOR (Consulta factores)
+  * DVL+QALI (Consulta alisado)
+  * DVL+QTADC (Consulta tiempo de muestreo)

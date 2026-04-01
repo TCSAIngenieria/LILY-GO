@@ -1,4 +1,5 @@
 #include "Modbus.h"
+#include "Debug.h"
 #include <Preferences.h>
 
 static Preferences prefs;
@@ -131,13 +132,13 @@ void modbus_load_from_prefs() {
 }
 
 void modbus_print_frames() {
-  Serial.println("[MODBUS] Frames configurados:");
+  DVL_PRINTLN("[MODBUS] Frames configurados:");
   for (int i = 0; i < MODBUS_MAX_FRAMES; i++) {
     if (frames[i].used) {
-      Serial.printf("  #%d: ID=0x%02X FUNC=0x%02X ADDR=0x%04X QTY=0x%04X\n",
+      DVL_PRINTF("  #%d: ID=0x%02X FUNC=0x%02X ADDR=0x%04X QTY=0x%04X\n",
                     i + 1, frames[i].id, frames[i].func, frames[i].addr, frames[i].qty);
     } else {
-      Serial.printf("  #%d: <vacío>\n", i + 1);
+      DVL_PRINTF("  #%d: <vacío>\n", i + 1);
     }
   }
 }
@@ -167,9 +168,9 @@ static void modbus_send_frame(const ModbusFrameCfg& f, uint8_t frameIndex) {
   mbPort->write(frame, sizeof(frame));
   mbPort->flush();
 
-  Serial.print("[MODBUS] TX: ");
-  for (int i = 0; i < 8; i++) Serial.printf("%02X ", frame[i]);
-  Serial.println();
+  DVL_PRINT("[MODBUS] TX: ");
+  for (int i = 0; i < 8; i++) DVL_PRINTF("%02X ", frame[i]);
+  DVL_PRINTLN("");
 
   // Leer respuesta rápida
   unsigned long t0 = millis();
@@ -184,15 +185,15 @@ static void modbus_send_frame(const ModbusFrameCfg& f, uint8_t frameIndex) {
   }
 
   if (len > 0) {
-    Serial.print("[MODBUS] RX: ");
+    DVL_PRINT("[MODBUS] RX: ");
     String hexResp = "";
     for (int i = 0; i < len; i++) {
-      Serial.printf("%02X ", buffer[i]);  // imprime en mayúsculas
+      DVL_PRINTF("%02X ", buffer[i]);  // imprime en mayúsculas
       char tmp[4];
       sprintf(tmp, "%02X ", buffer[i]);
       hexResp += tmp;  // guarda en string global
     }
-    Serial.println();
+    DVL_PRINTLN("");
     modbus_lastValues[frameIndex] = hexResp;  // guarda último RX para JSON
   } else {
     modbus_lastValues[frameIndex] = "";
