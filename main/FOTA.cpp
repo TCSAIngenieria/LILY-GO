@@ -1,5 +1,4 @@
 #include "FOTA.h"
-#include "Debug.h"
 #include <WiFi.h>              // Necesario para WiFi.status() y WL_CONNECTED
 #include <WiFiClientSecure.h>  // Para conexion HTTPS y client.setInsecure()
 #include <HTTPClient.h>
@@ -14,7 +13,7 @@ static bool updateStarted = false;  // Para evitar repetir la actualizacion
 
 void FOTAClass::startUpdate(const String& url) {
   if (updateStarted) {
-    DVL_PRINTLN("FOTA ya iniciada, ignorando llamada.");
+    Serial.println("FOTA ya iniciada, ignorando llamada.");
     return;
   }
   updateStarted = true;
@@ -22,24 +21,24 @@ void FOTAClass::startUpdate(const String& url) {
   // Desactivo watchdog para esta tarea antes de empezar FOTA
   esp_task_wdt_delete(NULL);
 
-  DVL_PRINTLN("Iniciando actualizacion FOTA desde:");
-  DVL_PRINTLN(url);
+  Serial.println("Iniciando actualizacion FOTA desde:");
+  Serial.println(url);
 
   if (WiFi.status() != WL_CONNECTED) {
-    DVL_PRINTLN("No hay conexion WiFi. No se puede actualizar.");
+    Serial.println("No hay conexion WiFi. No se puede actualizar.");
     updateStarted = false;
     esp_task_wdt_add(NULL);  // Reactivo watchdog
     return;
   }
 
   HTTPClient http;
-  DVL_PRINTLN("Conectando al servidor...");
+  Serial.println("Conectando al servidor...");
   client.setInsecure();  // Desactiva validacion SSL (usar solo para pruebas)
   http.begin(client, url);
 
   int httpCode = http.GET();
   if (httpCode != HTTP_CODE_OK) {
-    DVL_PRINTF(" Error HTTP al bajar el binario: %d\n", httpCode);
+    Serial.printf(" Error HTTP al bajar el binario: %d\n", httpCode);
     http.end();
     updateStarted = false;
     esp_task_wdt_add(NULL);
@@ -48,7 +47,7 @@ void FOTAClass::startUpdate(const String& url) {
 
   int contentLength = http.getSize();
   if (contentLength <= 0) {
-    DVL_PRINTLN("Tamaño del binario invalido.");
+    Serial.println("Tamaño del binario invalido.");
     http.end();
     updateStarted = false;
     esp_task_wdt_add(NULL);
@@ -57,14 +56,14 @@ void FOTAClass::startUpdate(const String& url) {
 
   bool canBegin = Update.begin(contentLength);
   if (!canBegin) {
-    DVL_PRINTLN("No se pudo iniciar la actualizacion. Memoria insuficiente?");
+    Serial.println("No se pudo iniciar la actualizacion. Memoria insuficiente?");
     http.end();
     updateStarted = false;
     esp_task_wdt_add(NULL);
     return;
   }
 
-  DVL_PRINTLN("Comenzando descarga y actualizacion...");
+  Serial.println("Comenzando descarga y actualizacion...");
   WiFiClient* stream = http.getStreamPtr();
 
   size_t written = 0;
@@ -77,7 +76,7 @@ void FOTAClass::startUpdate(const String& url) {
       size_t toRead = (available > bufferSize) ? bufferSize : available;
       int readBytes = stream->readBytes(buff, toRead);
       if (readBytes <= 0) {
-        DVL_PRINTLN(" Error leyendo los datos del stream.");
+        Serial.println(" Error leyendo los datos del stream.");
         http.end();
         updateStarted = false;
         esp_task_wdt_add(NULL);
@@ -86,7 +85,7 @@ void FOTAClass::startUpdate(const String& url) {
 
       int writtenBytes = Update.write(buff, readBytes);
       if (writtenBytes != readBytes) {
-        DVL_PRINTLN(" Error escribiendo la actualizacion.");
+        Serial.println(" Error escribiendo la actualizacion.");
         http.end();
         updateStarted = false;
         esp_task_wdt_add(NULL);
@@ -99,7 +98,7 @@ void FOTAClass::startUpdate(const String& url) {
       yield();
       delay(1);
 
-      DVL_PRINTF("Descargado %d/%d bytes\n", (int)written, contentLength);
+      Serial.printf("Descargado %d/%d bytes\n", (int)written, contentLength);
     } else {
       delay(1);
     }
@@ -108,17 +107,17 @@ void FOTAClass::startUpdate(const String& url) {
   http.end();
 
   if (written == (size_t)contentLength) {
-    DVL_PRINTLN("Finalizando actualizacion...");
+    Serial.println("Finalizando actualizacion...");
     if (Update.end(true)) {
-      DVL_PRINTLN("Actualizacion exitosa, reiniciando...");
+      Serial.println("Actualizacion exitosa, reiniciando...");
       ESP.restart();
     } else {
-      DVL_PRINTF("Error en Update.end(): %d\n", Update.getError());
+      Serial.printf("Error en Update.end(): %d\n", Update.getError());
       updateStarted = false;
       esp_task_wdt_add(NULL);
     }
   } else {
-    DVL_PRINTF("Descarga incompleta: %d de %d bytes\n", (int)written, contentLength);
+    Serial.printf("Descarga incompleta: %d de %d bytes\n", (int)written, contentLength);
     updateStarted = false;
     esp_task_wdt_add(NULL);
   }

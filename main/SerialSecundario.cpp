@@ -1,5 +1,4 @@
 #include "comandos.h"  // Para acceder a getStartMarker(), getEndMarker(), getSeparator(), etc.
-#include "Debug.h"
 #include <Arduino.h>
 
 String buffer = "";
@@ -31,7 +30,7 @@ void leerSensorSerial(Stream &serial) {
     if (!receiving && buffer.endsWith(getStartMarker())) {
       receiving = true;
       buffer = "";  // limpio el buffer para empezar a guardar la trama
-      DVL_PRINTLN("TRAMAAAAAAAA RECIBIDAAAAAAAAAAAAAA");
+      Serial.println("TRAMAAAAAAAA RECIBIDAAAAAAAAAAAAAA");
     }
 
     // Si estamos recibiendo y:
@@ -46,7 +45,7 @@ void leerSensorSerial(Stream &serial) {
       if (hayEndMarker) {
         // Quito el endMarker de la trama
         buffer.remove(buffer.length() - getEndMarker().length());
-        DVL_PRINT("endmaker");
+        Serial.print("endmaker");
       }
 
       // Parseo la trama usando el separador
@@ -65,30 +64,30 @@ void leerSensorSerial(Stream &serial) {
       }
 
       // Mostrar los valores
-      DVL_PRINTLN(">> Trama recibida:");
+      Serial.println(">> Trama recibida:");
       for (int i = 0; i < count; i++) {
-        DVL_PRINT("S");
-        DVL_PRINT(i);
-        DVL_PRINT(": ");
-        DVL_PRINTLN(sensorValues[i]);
+        Serial.print("S");
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.println(sensorValues[i]);
       }
 
       // Limpio para la proxima trama
-      DVL_PRINT("<< Respuesta de expansora: ");
-      DVL_PRINTLN(buffer);
+      Serial.print("<< Respuesta de expansora: ");
+      Serial.println(buffer);
       buffer = "";
     }
   }
 }
 
 void imprimirSensorValuesValidos() {
-  DVL_PRINTLN("ultimos sensores validos recibidos:");
+  Serial.println("ultimos sensores validos recibidos:");
   for (int i = 0; i < 16; i++) {
     if (sensorValues[i].length() > 0 && sensorValues[i] != "nan") {
-      DVL_PRINT("S ");
-      DVL_PRINT(i);
-      DVL_PRINT(": ");
-      DVL_PRINTLN(sensorValues[i]);
+      Serial.print("S ");
+      Serial.print(i);
+      Serial.print(": ");
+      Serial.println(sensorValues[i]);
     }
   }
 }

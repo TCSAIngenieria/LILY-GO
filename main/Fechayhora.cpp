@@ -1,5 +1,4 @@
 #include "Fechayhora.h"
-#include "Debug.h"
 #include <time.h>
 #include <sys/time.h>
 
@@ -26,7 +25,7 @@ void updateClockFromNTP_wifi() {
   }
 
   if (intentos >= maxIntentos) {
-    DVL_PRINTLN("[NTP]  Fallo la sincronizacion tras varios intentos");
+    Serial.println("[NTP]  Fallo la sincronizacion tras varios intentos");
     return;
   }
 
@@ -34,15 +33,15 @@ void updateClockFromNTP_wifi() {
   struct timeval tv = { .tv_sec = now };
   settimeofday(&tv, NULL);
 
-  DVL_PRINTLN("[NTP]  Sincronizacion exitosa");
-  DVL_PRINTLN(ctime(&now));
+  Serial.println("[NTP]  Sincronizacion exitosa");
+  Serial.println(ctime(&now));
   esp_task_wdt_reset();  // por las dudas, una mas
 }
 
 String printCurrentTime() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo, 100)) {  // Timeout de 100 ms
-    DVL_PRINTLN("⏱️ No se pudo obtener la hora local.");
+    Serial.println("⏱️ No se pudo obtener la hora local.");
     return "";
   }
 

@@ -1,5 +1,4 @@
 #include "WebServerConfig.h"
-#include "Debug.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Preferences.h>
@@ -176,14 +175,14 @@ void handleSave() {
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) {
       delay(500);
-      DVL_PRINT(".");
+      Serial.print(".");
     }
     if (WiFi.status() == WL_CONNECTED) {
-      DVL_PRINTLN("WiFi conectado!");
+      Serial.println("WiFi conectado!");
       wifiConfigurado = true;
       ESP.restart();
     } else {
-      DVL_PRINTLN("No pudo conectar, volviendo a AP");
+      Serial.println("No pudo conectar, volviendo a AP");
       iniciarModoConfiguracion();
     }
   } else {
@@ -192,19 +191,19 @@ void handleSave() {
 }
 
 void iniciarModoConfiguracion() {
-  DVL_PRINTLN("Modo configuracion: arranca AP");
+  Serial.println("Modo configuracion: arranca AP");
   WiFi.mode(WIFI_AP);
   WiFi.softAP("DVL AP");
 
   IPAddress IP = WiFi.softAPIP();
-  DVL_PRINT("AP IP: ");
-  DVL_PRINTLN(IP);
+  Serial.print("AP IP: ");
+  Serial.println(IP);
 
 
   if (MDNS.begin("wifi")) {
-    DVL_PRINTLN("mDNS responder iniciado: wifi.local");
+    Serial.println("mDNS responder iniciado: wifi.local");
   } else {
-    DVL_PRINTLN("Error iniciando mDNS");
+    Serial.println("Error iniciando mDNS");
   }
 
 
@@ -289,7 +288,7 @@ void handleSavePrivado() {
     preferences.end();
 
     adminServer.send(200, "text/html", "<h1>Guardado! <a href='/'>Volver</a></h1>");
-    DVL_PRINTLN("NUEVOS PARaMETROS MQTT");
+    Serial.println("NUEVOS PARaMETROS MQTT");
     ESP.restart();
   } else {
     adminServer.send(400, "text/plain", "Faltan datos");
@@ -306,5 +305,5 @@ void iniciarWebServerPrivado() {
   adminServer.on("/save", HTTP_POST, handleSavePrivado);
   adminServer.on("/valor", HTTP_GET, handleValorSensor);  // 👈 esta linea
   adminServer.begin();
-  DVL_PRINTLN("Servidor privado en puerto 8080 listo.");
+  Serial.println("Servidor privado en puerto 8080 listo.");
 }
