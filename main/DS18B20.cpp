@@ -34,7 +34,7 @@ float DS18B20::readValue() {
   float temp = sensors.getTempCByIndex(0);
 
   // Controla que la lectura no sea error por desconexion o valores invalidos tipicos
-  if (temp == DEVICE_DISCONNECTED_C || temp == -127.0 || temp < -55.0 || temp > 85.0) {
+  if (temp == DEVICE_DISCONNECTED_C || temp == -127.0 || temp < -20.0 || temp > 50.0) {
     DVL_PRINTLN(" Error leyendo la temperatura. Devolviendo ultima valida.");
     return ultimaTempValida;
   } else {

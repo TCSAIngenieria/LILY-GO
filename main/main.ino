@@ -30,7 +30,6 @@
 #include "SerialSecundario.h"
 #include "WebServerConfig.h"
 
-
 #ifdef DUMP_AT_COMMANDS
 #include <StreamDebugger.h>
 StreamDebugger debugger(SerialAT, SerialMon);
@@ -50,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.03.01";
+String versionado = "V02.03.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -599,30 +598,36 @@ void loop() {
     unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
     if (en_sensor == 1) {
-      DVL_PRINT("Sensor habilitado. Enviando dato por MQTT...");
+      float valSensor = valorStr.toFloat();
+      if (valSensor >= -20.0 && valSensor <= 50.0) {
+        DVL_PRINT("Sensor habilitado. Enviando dato por MQTT...");
 
-      String topicSensor = topic1 + "/DS18B20";
+        String topicSensor = topic1 + "/DS18B20";
 
-      String jsonsensor = create_mqtt_json_sensor(
-          topicSensor, ident, valorStr, printCurrentTime(),
-          leer_tension_bateria(), leer_tension_principal(), numPkt);
+        String jsonsensor = create_mqtt_json_sensor(
+            topicSensor, ident, valorStr, printCurrentTime(),
+            leer_tension_bateria(), leer_tension_principal(), numPkt);
 
-      if (mqtt.connected()) {
+        if (mqtt.connected()) {
 
-        if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
-          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
-        } else {
-          if (publish_mqtt_json(topicSensor, jsonsensor)) {
-            mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
+          if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
+            DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+          } else {
+            if (publish_mqtt_json(topicSensor, jsonsensor)) {
+              mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
+            }
           }
+
+        } else {
+          flash_save_packet(jsonsensor.c_str());
+
+          DVL_PRINTLN(mqtt.connected());
+
+          DVL_PRINTLN(WiFi.status());
         }
-
       } else {
-        flash_save_packet(jsonsensor.c_str());
-
-        DVL_PRINTLN(mqtt.connected());
-
-        DVL_PRINTLN(WiFi.status());
+        DVL_PRINT("Lectura de sensor fuera de rango (-20 a +50), descartada: ");
+        DVL_PRINTLN(valorStr);
       }
     }
 
