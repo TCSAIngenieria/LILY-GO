@@ -49,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.03.03";
+String versionado = "V02.03.06";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -150,6 +150,36 @@ float paramADC[3][2] = {{1, 0}, {1, 0}, {1, 0}};
 uint16_t tADC = 1;
 uint16_t cADC = 0;
 
+// Tarea en segundo plano para leer el boton de AP
+void buttonTaskTracker(void *pvParameters) {
+  pinMode(AP_BUTTON_PIN, INPUT_PULLUP);
+  unsigned long pressStart = 0;
+  bool pressed = false;
+
+  while (true) {
+    if (digitalRead(AP_BUTTON_PIN) == LOW) {
+      if (!pressed) {
+        pressStart = millis();
+        pressed = true;
+      } else if (millis() - pressStart >= BUTTON_PRESS_TIME) {
+        Serial.println("\n[!] Boton presionado 5 seg en Tarea Paralela! Reiniciando a Modo AP...");
+        
+        // Guardamos la bandera para forzar el AP en el reinicio
+        Preferences pref_temp;
+        pref_temp.begin("device", false);
+        pref_temp.putBool("forceAP", true);
+        pref_temp.end();
+        
+        delay(500); // Dar un repiro antes del reinicio
+        ESP.restart();
+      }
+    } else {
+      pressed = false;
+    }
+    vTaskDelay(pdMS_TO_TICKS(100)); // Relajar el procesador, check cada 100ms
+  }
+}
+
 void setup() {
   SerialMon.begin(115200); // puerto serial primario
   SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
@@ -168,12 +198,54 @@ void setup() {
   en_adc = preferences.getUInt("adc", 0);
   preferences.end();
 
-  // --- Contador de reinicios ---
+  // --- Contador de reinicios y Lectura de AP Mode ---
   preferences.begin("device", false);
+  bool forceAP = preferences.getBool("forceAP", false);
+  if (forceAP) {
+      preferences.putBool("forceAP", false); // Limpiar para que no re-entre siempre
+  }
   rebootCount = preferences.getULong("reboot", 0);
   rebootCount++;
   preferences.putULong("reboot", rebootCount);
   preferences.end();
+  
+  /*CONFIGURACION WIFI*/
+  preferences.begin("wifi", true);
+  ssid = preferences.getString("ssid", "Flash-PaPeR");
+  password = preferences.getString("password", "Ayanami84");
+  // ssid = preferences.getString("ssid", "Invitados");
+  // password = preferences.getString("password", "TCinvitados");
+  preferences.end();
+  if (forceAP) {
+      Serial.println("\n===============================================");
+      Serial.println(" Entrando en MODO CONFIGURACION (AP) INMEDIATO ");
+      Serial.println("===============================================\n");
+      
+      pinMode(LED_PIN, OUTPUT);
+      
+      wifiConfigurado = false;
+      iniciarModoConfiguracion();
+      iniciarWebServerPrivado();
+      
+      // Bucle infinito, omite el modem y Sensores por completo
+      while (true) {
+        server.handleClient();
+        adminServer.handleClient();
+        digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Parpadeo constante
+        delay(500);
+      }
+  }
+
+  // Lanzar la tarea de monitoreo del boton en el Nucleo 0 (el modem bloquea el Nucleo 1)
+  xTaskCreatePinnedToCore(
+      buttonTaskTracker, 
+      "ButtonTask", 
+      4096, 
+      NULL, 
+      1, 
+      NULL, 
+      0  // Nucleo 0 (PRO_CPU), así no interfiere con el loop (APP_CPU)
+  );
   // ----------------------
 
   preferences.begin("adc_config", true);
@@ -245,13 +317,7 @@ void setup() {
   DVL_PRINT("  Puerto: ");
   DVL_PRINTLN(MQTT_PORT);
 
-  /*CONFIGURACION WIFI*/
-  preferences.begin("wifi", true);
-  ssid = preferences.getString("ssid", "Flash-PaPeR");
-  password = preferences.getString("password", "Ayanami84");
-  // ssid = preferences.getString("ssid", "Invitados");
-  // password = preferences.getString("password", "TCinvitados");
-  preferences.end();
+  // La carga del WiFi se movio al principio del setup para verificar el modo AP
 
   if (ssid.length() > 0) {
     conectar_WiFi();
@@ -305,35 +371,7 @@ void loop() {
     last_10ms_event = now;
   }
 
-  // ---- VERIFICAR BOToN CONFIG ----
-  if ((digitalRead(AP_BUTTON_PIN) == LOW) || (ssid.length() == 0)) {
-
-    if (!buttonWasPressed) {
-      buttonPressStartTime = now;
-      buttonWasPressed = true;
-    } else if (now - buttonPressStartTime >= BUTTON_PRESS_TIME) {
-      DVL_PRINTLN(
-          "Boton presionado 5 segundos. Entrando en modo configuracion...");
-      mqtt.disconnect();
-      WiFi.disconnect(true); // Borra configuracion WiFi
-      delay(500);
-      wifiConfigurado = false;
-      iniciarModoConfiguracion();
-      iniciarWebServerPrivado();
-
-      // Bucle del modo AP
-      while (true) {
-
-        server.handleClient();
-        adminServer.handleClient();
-        digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-        delay(500);
-        esp_task_wdt_reset();
-      }
-    }
-  } else {
-    buttonWasPressed = false;
-  }
+  // (La deteccion del boton AP ahora se maneja en la tarea paralela buttonTaskTracker)
 
   // ========== FASE GPS ==========
   if (faseGPS) {

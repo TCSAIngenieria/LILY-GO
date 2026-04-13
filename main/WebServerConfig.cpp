@@ -183,8 +183,8 @@ void handleSave() {
       wifiConfigurado = true;
       ESP.restart();
     } else {
-      DVL_PRINTLN("No pudo conectar, volviendo a AP");
-      iniciarModoConfiguracion();
+      DVL_PRINTLN("No pudo conectar, reiniciando sistema...");
+      ESP.restart();
     }
   } else {
     server.send(400, "text/plain", "Faltan datos");
