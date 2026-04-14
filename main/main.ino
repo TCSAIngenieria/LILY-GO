@@ -49,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V03.01.01";
+String versionado = "V03.02.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -87,6 +87,11 @@ extern String sensorValues[16];
 const char apn[] = "igprs.claro.com.ar"; // APN
 const char gprsUser[] = "";
 const char gprsPass[] = "";
+
+// Datos estaticos del modem
+String modemIMEI = "";
+String modemIMSI = "";
+String modemICCID = "";
 
 // conectividad
 bool TINY_GSM_USE_GPRS = true;  // uso del gprs
@@ -799,9 +804,22 @@ void loop() {
       cDetail = getGSMTech();
     }
 
+    // Consultar info unica del modem siempre, sin importar si usamos WiFi o GSM
+    if (modemIMEI.length() < 10 || modemICCID.length() < 10) {
+      static unsigned long lastModemQuery = 0;
+      // Reintentar capturarlos maximo una vez cada 30 segundos para no saturar ni bloquear si no hay chip
+      if (lastModemQuery == 0 || (millis() - lastModemQuery > 30000)) {
+        modemIMEI = modem.getIMEI();
+        modemIMSI = modem.getIMSI();
+        modemICCID = modem.getSimCCID();
+        modemICCID.toUpperCase();
+        lastModemQuery = millis();
+      }
+    }
+
     String jsonKeepAlive = create_mqtt_json_keepalive(
         ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
-        rebootCount, cType, cDetail);
+        rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID);
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }

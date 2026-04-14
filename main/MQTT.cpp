@@ -216,7 +216,8 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String latitud, String longitud,
                                   String versionado,
                                   unsigned long rebootCount,
-                                  String connType, String connDetail) {
+                                  String connType, String connDetail,
+                                  String imei, String imsi, String iccid) {
   StaticJsonDocument<512> doc;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
@@ -227,6 +228,9 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
   doc["reboot_count"] = rebootCount;
   doc["conn_type"] = connType;
   doc["conn_detail"] = connDetail;
+  doc["IMEI"] = imei;
+  doc["IMSI"] = imsi;
+  doc["ICCID"] = iccid;
 
   char payload[512];
   serializeJson(doc, payload);
