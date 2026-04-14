@@ -123,9 +123,12 @@ void updateInternalClock(String clockString) {
   struct tm tm;
   memset(&tm, 0, sizeof(tm));
 
-  // clockString: "25/06/03,10:28:55+00"
-  int yy, MM, dd, hh, mm, ss;
-  if (sscanf(clockString.c_str(), "\"%2d/%2d/%2d,%2d:%2d:%2d", &yy, &MM, &dd, &hh, &mm, &ss) == 6) {
+  // clockString: "25/06/03,10:28:55-12"
+  int yy, MM, dd, hh, mm, ss, tz;
+  char tz_sign = '+';
+  tz = 0;
+  
+  if (sscanf(clockString.c_str(), "\"%2d/%2d/%2d,%2d:%2d:%2d%c%2d", &yy, &MM, &dd, &hh, &mm, &ss, &tz_sign, &tz) >= 6) {
     tm.tm_year = 2000 + yy - 1900;  // Año desde 1900
     tm.tm_mon = MM - 1;             // Mes 0-11
     tm.tm_mday = dd;
@@ -133,11 +136,23 @@ void updateInternalClock(String clockString) {
     tm.tm_min = mm;
     tm.tm_sec = ss;
 
+    // Asumimos que mktime trata esta tm como UTC (dado que seteamos el env timezone a 0)
     time_t t = mktime(&tm);
+
+    // Corregir mediante el uso de huso horario devuelto (tz viene expresado en cuartos de hora)
+    if (tz > 0) {
+      int offsetSecs = tz * 15 * 60;
+      if (tz_sign == '+') {
+        t -= offsetSecs; // El tiempo local le lleva N horas a UTC -> restamos para volver al UTC absoluto
+      } else if (tz_sign == '-') {
+        t += offsetSecs; // El tiempo local atrasa N horas a UTC -> sumamos para volver al UTC absoluto
+      }
+    }
+
     struct timeval now = { .tv_sec = t };
     settimeofday(&now, NULL);
 
-    DVL_PRINTLN("[RTC] Reloj interno actualizado:");
+    DVL_PRINTLN("[RTC] Reloj interno sincronizado a UTC absoluto:");
     DVL_PRINTLN(ctime(&t));
   } else {
     DVL_PRINTLN("[RTC] Error al parsear +CCLK");
