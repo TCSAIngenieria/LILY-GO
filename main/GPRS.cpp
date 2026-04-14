@@ -190,3 +190,49 @@ String getGSMTech() {
   }
   return "UNKNOWN";
 }
+
+void getModemSignalInfo(TinyGsm &modem, String &rsrq, String &rsrp, String &rssi) {
+  rsrq = "N/A"; rsrp = "N/A"; rssi = "N/A";
+  String res;
+  modem.sendAT("+CPSI?");
+  if (modem.waitResponse(1000L, res) == 1) {
+    int index = res.indexOf("+CPSI:");
+    if (index != -1) {
+        int startPos = index + 6;
+        int nextCRLF = res.indexOf("\r", startPos);
+        if (nextCRLF != -1) {
+           res = res.substring(startPos, nextCRLF);
+        } else {
+           res = res.substring(startPos);
+        }
+        res.trim();
+        
+        String parts[16];
+        int count = 0;
+        int pos = 0;
+        int length = res.length();
+        while (pos < length && count < 16) {
+           int commaPos = res.indexOf(',', pos);
+           if (commaPos == -1) {
+               parts[count++] = res.substring(pos);
+               break;
+           } else {
+               parts[count++] = res.substring(pos, commaPos);
+               pos = commaPos + 1;
+           }
+        }
+        
+        if (parts[0].indexOf("LTE") != -1 || parts[0].indexOf("CAT-M1") != -1 || parts[0].indexOf("NB-IoT") != -1) {
+           if (count >= 13) {
+              rsrq = parts[count-4];
+              rsrp = parts[count-3];
+              rssi = parts[count-2];
+           }
+        } else if (parts[0].indexOf("GSM") != -1) {
+           if (count >= 7) {
+              rssi = parts[6];
+           }
+        }
+    }
+  }
+}

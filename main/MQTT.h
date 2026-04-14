@@ -44,6 +44,7 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String latitud, String longitud,
                                   String versionado, unsigned long rebootCount,
                                   String connType, String connDetail,
-                                  String imei, String imsi, String iccid);
+                                  String imei, String imsi, String iccid,
+                                  String rsrq, String rsrp, String rssi);
 
 #endif

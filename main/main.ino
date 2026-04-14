@@ -49,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V03.02.03";
+String versionado = "V03.03.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -795,19 +795,25 @@ void loop() {
   if (now - lastNoDataMessage > 5000) {
     String cType = "NO_CONECTADO";
     String cDetail = "N/A";
+    String rsrq = "N/A";
+    String rsrp = "N/A";
+    String rssi = "N/A";
 
     if (WiFi.status() == WL_CONNECTED) {
       cType = "WIFI";
       cDetail = WiFi.SSID();
+      rssi = String(WiFi.RSSI());
     } else if (modem.isGprsConnected() || modem.isNetworkConnected()) {
       cType = "GSM";
       cDetail = getGSMTech();
+      getModemSignalInfo(modem, rsrq, rsrp, rssi);
     }
 
     // Consultar info unica del modem siempre, sin importar si usamos WiFi o GSM
     if (modemIMEI.length() < 10 || modemICCID.length() < 10) {
       static unsigned long lastModemQuery = 0;
-      // Reintentar capturarlos maximo una vez cada 30 segundos para no saturar ni bloquear si no hay chip
+      // Reintentar capturarlos maximo una vez cada 30 segundos para no saturar
+      // ni bloquear si no hay chip
       if (lastModemQuery == 0 || (millis() - lastModemQuery > 30000)) {
         modemIMEI = modem.getIMEI();
         modemIMSI = modem.getIMSI();
@@ -819,7 +825,8 @@ void loop() {
 
     String jsonKeepAlive = create_mqtt_json_keepalive(
         ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
-        rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID);
+        rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
+        rsrp, rssi);
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }
