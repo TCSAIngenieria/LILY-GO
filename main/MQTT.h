@@ -42,6 +42,7 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
 
 String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String latitud, String longitud,
-                                  String versionado, unsigned long rebootCount);
+                                  String versionado, unsigned long rebootCount,
+                                  String connType, String connDetail);
 
 #endif

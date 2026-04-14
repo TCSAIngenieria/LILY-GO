@@ -180,3 +180,13 @@ void updateNetworkConnection(TinyGsm &modem) {
     digitalWrite(LED_PIN, HIGH);  // LED ON si conecta
   }
 }
+
+String getGSMTech() {
+  if (currentModeIndex >= 0 && currentModeIndex < 3) {
+    uint8_t mode = networkModes[currentModeIndex];
+    if (mode == 38) return "LTE CAT-M1 (eMTC)";
+    if (mode == 39) return "NB-IoT";
+    if (mode == 13) return "2G (GSM/GPRS/EDGE)";
+  }
+  return "UNKNOWN";
+}

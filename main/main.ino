@@ -49,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V02.03.06";
+String versionado = "V03.01.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -150,7 +150,7 @@ float paramADC[3][2] = {{1, 0}, {1, 0}, {1, 0}};
 uint16_t tADC = 1;
 uint16_t cADC = 0;
 
-// Tarea en segundo plano para leer el boton de AP
+// Tarea paralela para entrar en modo AP
 void buttonTaskTracker(void *pvParameters) {
   pinMode(AP_BUTTON_PIN, INPUT_PULLUP);
   unsigned long pressStart = 0;
@@ -162,21 +162,20 @@ void buttonTaskTracker(void *pvParameters) {
         pressStart = millis();
         pressed = true;
       } else if (millis() - pressStart >= BUTTON_PRESS_TIME) {
-        Serial.println("\n[!] Boton presionado 5 seg en Tarea Paralela! Reiniciando a Modo AP...");
-        
+        Serial.println("\n Boton presionado entrando en Tarea Paralela! "
+                       "Reiniciando a Modo AP...");
+
         // Guardamos la bandera para forzar el AP en el reinicio
         Preferences pref_temp;
         pref_temp.begin("device", false);
         pref_temp.putBool("forceAP", true);
         pref_temp.end();
-        
-        delay(500); // Dar un repiro antes del reinicio
         ESP.restart();
       }
     } else {
       pressed = false;
     }
-    vTaskDelay(pdMS_TO_TICKS(100)); // Relajar el procesador, check cada 100ms
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
@@ -202,50 +201,44 @@ void setup() {
   preferences.begin("device", false);
   bool forceAP = preferences.getBool("forceAP", false);
   if (forceAP) {
-      preferences.putBool("forceAP", false); // Limpiar para que no re-entre siempre
+    preferences.putBool("forceAP",
+                        false); // Limpiar para que no re-entre siempre
   }
   rebootCount = preferences.getULong("reboot", 0);
   rebootCount++;
   preferences.putULong("reboot", rebootCount);
   preferences.end();
-  
+
   /*CONFIGURACION WIFI*/
   preferences.begin("wifi", true);
-  ssid = preferences.getString("ssid", "Flash-PaPeR");
-  password = preferences.getString("password", "Ayanami84");
-  // ssid = preferences.getString("ssid", "Invitados");
-  // password = preferences.getString("password", "TCinvitados");
+  // ssid = preferences.getString("ssid", "Flash-PaPeR");
+  // password = preferences.getString("password", "Ayanami84");
+  ssid = preferences.getString("ssid", "Invitados");
+  password = preferences.getString("password", "TCinvitados");
   preferences.end();
   if (forceAP) {
-      Serial.println("\n===============================================");
-      Serial.println(" Entrando en MODO CONFIGURACION (AP) INMEDIATO ");
-      Serial.println("===============================================\n");
-      
-      pinMode(LED_PIN, OUTPUT);
-      
-      wifiConfigurado = false;
-      iniciarModoConfiguracion();
-      iniciarWebServerPrivado();
-      
-      // Bucle infinito, omite el modem y Sensores por completo
-      while (true) {
-        server.handleClient();
-        adminServer.handleClient();
-        digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Parpadeo constante
-        delay(500);
-      }
+    Serial.println("\n===============================================");
+    Serial.println(" Entrando en MODO CONFIGURACION (AP) INMEDIATO ");
+    Serial.println("===============================================\n");
+
+    pinMode(LED_PIN, OUTPUT);
+
+    wifiConfigurado = false;
+    iniciarModoConfiguracion();
+    iniciarWebServerPrivado();
+
+    // Bucle infinito, omite el modem y Sensores por completo
+    while (true) {
+      server.handleClient();
+      adminServer.handleClient();
+      digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Parpadeo constante
+      delay(500);
+    }
   }
 
-  // Lanzar la tarea de monitoreo del boton en el Nucleo 0 (el modem bloquea el Nucleo 1)
-  xTaskCreatePinnedToCore(
-      buttonTaskTracker, 
-      "ButtonTask", 
-      4096, 
-      NULL, 
-      1, 
-      NULL, 
-      0  // Nucleo 0 (PRO_CPU), así no interfiere con el loop (APP_CPU)
-  );
+  // Lanza la tarea paralela de monitoreo del boton en el Nucleo 0
+  xTaskCreatePinnedToCore(buttonTaskTracker, "ButtonTask", 4096, NULL, 1, NULL,
+                          0);
   // ----------------------
 
   preferences.begin("adc_config", true);
@@ -371,7 +364,8 @@ void loop() {
     last_10ms_event = now;
   }
 
-  // (La deteccion del boton AP ahora se maneja en la tarea paralela buttonTaskTracker)
+  // (La deteccion del boton AP ahora se maneja en la tarea paralela
+  // buttonTaskTracker)
 
   // ========== FASE GPS ==========
   if (faseGPS) {
@@ -794,9 +788,20 @@ void loop() {
 
   // Keep Alive si no hay datos para transmitir
   if (now - lastNoDataMessage > 5000) {
-    String jsonKeepAlive =
-        create_mqtt_json_keepalive(ident, printCurrentTime(), ultimaLat,
-                                   ultimaLon, versionado, rebootCount);
+    String cType = "NO_CONECTADO";
+    String cDetail = "N/A";
+
+    if (WiFi.status() == WL_CONNECTED) {
+      cType = "WIFI";
+      cDetail = WiFi.SSID();
+    } else if (modem.isGprsConnected() || modem.isNetworkConnected()) {
+      cType = "GSM";
+      cDetail = getGSMTech();
+    }
+
+    String jsonKeepAlive = create_mqtt_json_keepalive(
+        ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
+        rebootCount, cType, cDetail);
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }

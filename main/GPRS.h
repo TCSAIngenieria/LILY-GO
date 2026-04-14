@@ -33,5 +33,6 @@ void updateNetworkConnection(TinyGsm &modem);
 bool updateClockFromNTP(TinyGsm &modem);
 void updateInternalClock(String clockString);
 String printCurrentTime();
+String getGSMTech();
 
 #endif
