@@ -123,9 +123,12 @@ void updateInternalClock(String clockString) {
   struct tm tm;
   memset(&tm, 0, sizeof(tm));
 
-  // clockString: "25/06/03,10:28:55+00"
-  int yy, MM, dd, hh, mm, ss;
-  if (sscanf(clockString.c_str(), "\"%2d/%2d/%2d,%2d:%2d:%2d", &yy, &MM, &dd, &hh, &mm, &ss) == 6) {
+  // clockString: "25/06/03,10:28:55-12"
+  int yy, MM, dd, hh, mm, ss, tz;
+  char tz_sign = '+';
+  tz = 0;
+  
+  if (sscanf(clockString.c_str(), "\"%2d/%2d/%2d,%2d:%2d:%2d%c%2d", &yy, &MM, &dd, &hh, &mm, &ss, &tz_sign, &tz) >= 6) {
     tm.tm_year = 2000 + yy - 1900;  // Año desde 1900
     tm.tm_mon = MM - 1;             // Mes 0-11
     tm.tm_mday = dd;
@@ -133,11 +136,23 @@ void updateInternalClock(String clockString) {
     tm.tm_min = mm;
     tm.tm_sec = ss;
 
+    // Asumimos que mktime trata esta tm como UTC (dado que seteamos el env timezone a 0)
     time_t t = mktime(&tm);
+
+    // Corregir mediante el uso de huso horario devuelto (tz viene expresado en cuartos de hora)
+    if (tz > 0) {
+      int offsetSecs = tz * 15 * 60;
+      if (tz_sign == '+') {
+        t -= offsetSecs; // El tiempo local le lleva N horas a UTC -> restamos para volver al UTC absoluto
+      } else if (tz_sign == '-') {
+        t += offsetSecs; // El tiempo local atrasa N horas a UTC -> sumamos para volver al UTC absoluto
+      }
+    }
+
     struct timeval now = { .tv_sec = t };
     settimeofday(&now, NULL);
 
-    DVL_PRINTLN("[RTC] Reloj interno actualizado:");
+    DVL_PRINTLN("[RTC] Reloj interno sincronizado a UTC absoluto:");
     DVL_PRINTLN(ctime(&t));
   } else {
     DVL_PRINTLN("[RTC] Error al parsear +CCLK");
@@ -178,5 +193,61 @@ void updateNetworkConnection(TinyGsm &modem) {
     currentModeIndex = (currentModeIndex + 1) % 3;  // Cambia al siguiente modo
   } else {
     digitalWrite(LED_PIN, HIGH);  // LED ON si conecta
+  }
+}
+
+String getGSMTech() {
+  if (currentModeIndex >= 0 && currentModeIndex < 3) {
+    uint8_t mode = networkModes[currentModeIndex];
+    if (mode == 38) return "LTE CAT-M1 (eMTC)";
+    if (mode == 39) return "NB-IoT";
+    if (mode == 13) return "2G (GSM/GPRS/EDGE)";
+  }
+  return "UNKNOWN";
+}
+
+void getModemSignalInfo(TinyGsm &modem, String &rsrq, String &rsrp, String &rssi) {
+  rsrq = "N/A"; rsrp = "N/A"; rssi = "N/A";
+  String res;
+  modem.sendAT("+CPSI?");
+  if (modem.waitResponse(1000L, res) == 1) {
+    int index = res.indexOf("+CPSI:");
+    if (index != -1) {
+        int startPos = index + 6;
+        int nextCRLF = res.indexOf("\r", startPos);
+        if (nextCRLF != -1) {
+           res = res.substring(startPos, nextCRLF);
+        } else {
+           res = res.substring(startPos);
+        }
+        res.trim();
+        
+        String parts[16];
+        int count = 0;
+        int pos = 0;
+        int length = res.length();
+        while (pos < length && count < 16) {
+           int commaPos = res.indexOf(',', pos);
+           if (commaPos == -1) {
+               parts[count++] = res.substring(pos);
+               break;
+           } else {
+               parts[count++] = res.substring(pos, commaPos);
+               pos = commaPos + 1;
+           }
+        }
+        
+        if (parts[0].indexOf("LTE") != -1 || parts[0].indexOf("CAT-M1") != -1 || parts[0].indexOf("NB-IoT") != -1) {
+           if (count >= 13) {
+              rsrq = parts[count-4];
+              rsrp = parts[count-3];
+              rssi = parts[count-2];
+           }
+        } else if (parts[0].indexOf("GSM") != -1) {
+           if (count >= 7) {
+              rssi = parts[6];
+           }
+        }
+    }
   }
 }

@@ -215,8 +215,11 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
 String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String latitud, String longitud,
                                   String versionado,
-                                  unsigned long rebootCount) {
-  StaticJsonDocument<256> doc;
+                                  unsigned long rebootCount,
+                                  String connType, String connDetail,
+                                  String imei, String imsi, String iccid,
+                                  String rsrq, String rsrp, String rssi) {
+  StaticJsonDocument<512> doc;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
@@ -224,8 +227,16 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
   doc["longitud"] = longitud;
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
+  doc["conn_type"] = connType;
+  doc["conn_detail"] = connDetail;
+  doc["IMEI"] = imei;
+  doc["IMSI"] = imsi;
+  doc["ICCID"] = iccid;
+  doc["RSRQ"] = rsrq;
+  doc["RSRP"] = rsrp;
+  doc["RSSI"] = rssi;
 
-  char payload[256];
+  char payload[512];
   serializeJson(doc, payload);
   return String(payload);
 }

@@ -40,11 +40,15 @@ void updateClockFromNTP_wifi() {
 }
 
 String printCurrentTime() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 100)) {  // Timeout de 100 ms
-    DVL_PRINTLN("⏱️ No se pudo obtener la hora local.");
+  time_t now;
+  time(&now);
+  if (now < 10000) {  // Validar si la hora aun no se inicializo
+    DVL_PRINTLN("⏱️ No se pudo obtener la hora.");
     return "";
   }
+
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
 
   char buffer[30];
   strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
