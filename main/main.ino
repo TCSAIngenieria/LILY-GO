@@ -49,7 +49,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V03.03.03";
+String versionado = "V03.04.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -236,8 +236,14 @@ void setup() {
     while (true) {
       server.handleClient();
       adminServer.handleClient();
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Parpadeo constante
-      delay(500);
+
+      // Parpadeo bien rapido (estroboscopico) de 50ms para modo AP
+      if ((millis() / 50) % 2 == 0) {
+        digitalWrite(LED_PIN, HIGH);
+      } else {
+        digitalWrite(LED_PIN, LOW);
+      }
+      delay(10); // delay minimo para dar aire al perro guardian
     }
   }
 
@@ -860,42 +866,55 @@ void loop() {
 void actualizarLED() {
   unsigned long now = millis();
 
-  // Si esta en modo configuracion (AP) → no tocamos nada (ya se maneja en
-  // loop del AP)
-  if (!wifiConfigurado &&
-      (ssid.length() == 0 || digitalRead(AP_BUTTON_PIN) == LOW))
-    return;
+  // 1. MQTT Activo y debidamente conectado
+  if (mqttActivo && mqtt.connected() &&
+      (now - mqttUltimaConexionOK <= MQTT_TIMEOUT)) {
+    int seqMQTT = now % 5000; // Ciclo de 5 segundos
 
-  // MQTT activo y dentro de los 5 minutos desde la ultima conexion → LED
-  // fijo
-  if (mqttActivo && (now - mqttUltimaConexionOK <= MQTT_TIMEOUT)) {
-    digitalWrite(LED_PIN, HIGH);
+    if (WiFi.status() == WL_CONNECTED) {
+      // WiFi: 1 parpadeo de apagado cada 5 segundos
+      if (seqMQTT >= 0 && seqMQTT < 100) {
+        digitalWrite(LED_PIN, LOW);
+      } else {
+        digitalWrite(LED_PIN, HIGH);
+      }
+    } else {
+      // GPRS: 2 parpadeos de apagado cada 5 segundos
+      if ((seqMQTT >= 0 && seqMQTT < 100) || (seqMQTT > 200 && seqMQTT < 300)) {
+        digitalWrite(LED_PIN, LOW);
+      } else {
+        digitalWrite(LED_PIN, HIGH);
+      }
+    }
     return;
   }
 
-  // Conectado a WiFi o GPRS pero sin conexion MQTT → doble parpadeo rapido
-  // cada 2 segundos
-  if (((WiFi.status() == WL_CONNECTED) || (modem.isGprsConnected())) &&
-      !mqtt.connected()) {
-    static int blinkCount = 0;
-    static unsigned long blinkStart = 0;
+  // Si no hay conexion a MQTT, dependemos de que red estemos usando.
+  int seq = now % 2000; // Ciclo general de 2 segundos para las secuencias
 
-    if (now - blinkStart >= 2000) {
-      blinkStart = now;
-      blinkCount = 0;
+  // 2. Conectado a WiFi -> Triple parpadeo veloz (3 destellos cortos cada 2
+  // seg)
+  if (WiFi.status() == WL_CONNECTED) {
+    if ((seq >= 0 && seq < 100) || (seq > 200 && seq < 300) ||
+        (seq > 400 && seq < 500)) {
+      digitalWrite(LED_PIN, HIGH);
+    } else {
+      digitalWrite(LED_PIN, LOW);
     }
-
-    if (blinkCount < 2 && now - ledTimer >= 200) {
-      ledState = !ledState;
-      digitalWrite(LED_PIN, ledState ? HIGH : LOW);
-      ledTimer = now;
-      blinkCount++;
-    }
-
     return;
   }
 
-  // No hay WiFi o GPRS → LED apagado
+  // 3. Conectado a GPRS -> Parpadeo singular y corto (1 latido cada 2 seg)
+  if (modem.isGprsConnected() || modem.isNetworkConnected()) {
+    if (seq >= 0 && seq < 200) { // 200ms prendido, 1800ms apagado
+      digitalWrite(LED_PIN, HIGH);
+    } else {
+      digitalWrite(LED_PIN, LOW);
+    }
+    return;
+  }
+
+  // 4. Completamente Desconectado -> LED Apagado
   digitalWrite(LED_PIN, LOW);
 }
 
