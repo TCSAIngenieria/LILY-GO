@@ -106,7 +106,11 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       // --- Prepare MokoSensorData ---
       MokoSensorData h4Data;
       h4Data.valid = false;
-      h4Data.name = "H4_PRO";
+      if (advertisedDevice->haveName()) {
+        h4Data.name = String(advertisedDevice->getName().c_str());
+      } else {
+        h4Data.name = "unknown";
+      }
       String cleanMacH4 = String(macAddress.c_str());
       cleanMacH4.replace(":", "");
       h4Data.mac = cleanMacH4;
@@ -178,7 +182,11 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 sprintf(fwBuf, "V%d.%d.%d", payload[frameStart + 13] >> 4, payload[frameStart + 13] & 0x0F, payload[frameStart + 14] & 0x0F);
                 h4Data.firmwareVersion = String(fwBuf);
 
-                DVL_PRINTF("  H4Pro [0x40] -> Batt: %d%%, FW: %s, TagID: %s\n", h4Data.batteryLevel, fwBuf, h4Data.tag_id.c_str());
+                if (frameStart + 15 < payload.size()) {
+                  h4Data.deviceType = payload[frameStart + 15];
+                }
+
+                DVL_PRINTF("  H4Pro [0x40] -> DevType: %d, Batt: %d%%, FW: %s, TagID: %s\n", h4Data.deviceType, h4Data.batteryLevel, fwBuf, h4Data.tag_id.c_str());
                 h4Data.valid = true;
               }
               break;
@@ -270,10 +278,10 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 // Device type (unsigned int8, index 19 -> frameStart + 9)
                 h4Data.deviceType = payload[frameStart + 9];
 
-                DVL_PRINTF("  H4Pro [0x70] -> Temp: %.1f C, Hum: %.1f %%, Batt: %d%%\n",
-                              h4Data.temperature, h4Data.humidity, battPct);
-                DVL_PRINTF("  Ranging: %d dBm, AdvInt: %d ms, DevType: %d\n",
-                              h4Data.rangingData, h4Data.advInterval, h4Data.deviceType);
+                DVL_PRINTF("  H4Pro [0x70] -> DevType: %d, Temp: %.1f C, Hum: %.1f %%, Batt: %d%%\n",
+                              h4Data.deviceType, h4Data.temperature, h4Data.humidity, battPct);
+                DVL_PRINTF("  Ranging: %d dBm, AdvInt: %d ms\n",
+                              h4Data.rangingData, h4Data.advInterval);
                 h4Data.valid = true;
               }
               break;
