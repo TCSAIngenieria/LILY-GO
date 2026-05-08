@@ -15,7 +15,7 @@ String ssid = "";
 String password = "";
 bool wifiConfigurado = false;
 
-extern SensorInterface* sensor;
+
 
 
 
@@ -296,10 +296,7 @@ void handleSavePrivado() {
   }
 }
 
-void handleValorSensor() {
-  float val = sensor->readValue();
-  adminServer.send(200, "text/plain", String(val, 2));
-}
+void handleValorSensor() { adminServer.send(200, "text/plain", "N/A"); }
 
 void iniciarWebServerPrivado() {
   adminServer.on("/", handleRootPrivado);
@@ -308,3 +305,4 @@ void iniciarWebServerPrivado() {
   adminServer.begin();
   DVL_PRINTLN("Servidor privado en puerto 8080 listo.");
 }
+

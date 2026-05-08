@@ -39,6 +39,12 @@ void updateClockFromNTP_wifi() {
   esp_task_wdt_reset();  // por las dudas, una mas
 }
 
+bool isTimeSet() {
+  time_t now;
+  time(&now);
+  return (now > 1000000000L); // Un timestamp valido es mayor a ~2001
+}
+
 String printCurrentTime() {
   time_t now;
   time(&now);

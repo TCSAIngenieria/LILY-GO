@@ -14,7 +14,7 @@ String ultimaLon = "-64.123456";
 extern String ident;
 
 String spublishInterval;
-unsigned long publishInterval = 60;
+unsigned long publishInterval = 300;
 
 /*MEMORIA CIRCULAR*/
 static int writeIndex = 0;
