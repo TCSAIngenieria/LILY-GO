@@ -54,6 +54,15 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+STIME=<seg>` | Establece el intervalo de publicación de datos en segundos. | `DVL+STIME=60` |
 | `EXP+<cmd>` | Envía el comando `<cmd>` directamente a la expansora por serial secundario. | `EXP+LEER` |
 
+## Comandos de Sistema PIVOT (Monitoreo y Alarma)
+
+| Comando | Descripcin | Ejemplo |
+|:---|:---|:---|
+| `DVL+PIVON` | Habilita el sistema PIVOT (requiere entradas distintas). | `DVL+PIVON` |
+| `DVL+PIVOFF` | Deshabilita el sistema, apaga sirena y limpia el enclavamiento. | `DVL+PIVOFF` |
+| `DVL+SDSIR=<seg>` | Configura el retardo antes de activar la sirena (segundos). | `DVL+SDSIR=300` |
+| `DVL+STSIR=<seg>` | Configura el tiempo mǭximo de sirena encendida (0=infinito). | `DVL+STSIR=60` |
+
 ## Comandos de Consulta (Query)
 
 | Comando | Descripción | Retorno Ejemplo |
@@ -73,3 +82,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QPARSE` | Muestra el separador configurado. | `SEPARATOR=,` |
 | `DVL+QLAT` | Muestra la última latitud registrada. | `LAT=-34.60` |
 | `DVL+QLONG` | Muestra la última longitud registrada. | `LONG=-58.38` |
+
+| `DVL+QPIV` | Consulta si el sistema PIVOT estǭ habilitado. | `PIVOT=1` |
+| `DVL+QDSIR` | Consulta el retardo de activacin de la sirena. | `DSIR=300` |
+| `DVL+QTSIR` | Consulta el tiempo de duracin de la sirena. | `TSIR=60` |

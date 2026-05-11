@@ -22,6 +22,9 @@ uint en_ble = 0;
 uint en_adc = 0;
 uint en_pivot = 0;
 unsigned long delay_sirena = 300;
+unsigned long siren_duration = 0;
+#define PIN_IN_1 13
+#define PIN_IN_2 14
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
@@ -103,11 +106,17 @@ String procesarComando(String comando) {
     respuesta = "EN_ADC=" + String(en_adc);
 
   } else if (comando == "DVL+PIVON") {
-    en_pivot = 1;
-    preferences.begin("enables", false);
-    preferences.putUInt("pivot", 1);
-    preferences.end();
-    respuesta = ">> SISTEMA PIVOT HABILITADO";
+    if (en_pivot == 1) {
+      respuesta = "[ERR] el sistema ya esta activado. Primero debe desactivarlo con PIVOFF";
+    } else if (digitalRead(PIN_IN_1) == digitalRead(PIN_IN_2)) {
+      respuesta = "[ERR] se debe revisar la instalacion";
+    } else {
+      en_pivot = 1;
+      preferences.begin("enables", false);
+      preferences.putUInt("pivot", 1);
+      preferences.end();
+      respuesta = ">> SISTEMA PIVOT HABILITADO";
+    }
 
   } else if (comando == "DVL+PIVOFF") {
     en_pivot = 0;
@@ -126,6 +135,17 @@ String procesarComando(String comando) {
 
   } else if (comando == "DVL+QDSIR") {
     respuesta = "DSIR=" + String(delay_sirena);
+
+  } else if (comando.startsWith("DVL+STSIR=")) {
+    String stsir_s = comando.substring(10);
+    siren_duration = strtoul(stsir_s.c_str(), NULL, 10);
+    preferences.begin("device", false);
+    preferences.putULong("tsir", siren_duration);
+    preferences.end();
+    respuesta = "DURACION SIRENA SETEADO OK (segundos): " + String(siren_duration);
+
+  } else if (comando == "DVL+QTSIR") {
+    respuesta = "TSIR=" + String(siren_duration);
 
   } else if (comando == "DVL+QPIV") {
     preferences.begin("enables", true);

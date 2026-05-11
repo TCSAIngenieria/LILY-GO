@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V02.02.03-AGD_Pivots";
+String versionado = "V02.03.04-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -79,6 +79,7 @@ extern uint en_ble;
 extern uint en_adc;
 extern uint en_pivot; // Sistema Pivot/Alarma habilitado
 extern unsigned long delay_sirena;
+extern unsigned long siren_duration;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -217,6 +218,7 @@ void setup() {
   rebootCount++;
   preferences.putULong("reboot", rebootCount);
   delay_sirena = preferences.getULong("dsir", 300);
+  siren_duration = preferences.getULong("tsir", 300);
   preferences.end();
 
   /*CONFIGURACION WIFI*/
@@ -463,33 +465,61 @@ void loop() {
 
   // Sirena: solo actuar si el sistema Pivot esta habilitado
   static unsigned long alarmStartTime = 0;
-  if (en_pivot && isAlarm) {
-    if (alarmStartTime == 0) {
-      alarmStartTime = millis();
-      if (alarmStartTime == 0)
-        alarmStartTime = 1; // Asegurar que no sea 0
-      DVL_PRINTLN("--- ALARMA DETECTADA ---");
-      DVL_PRINT("Retardo configurado (seg): ");
-      DVL_PRINTLN(delay_sirena);
-    }
+  static bool alarmLatched = false;
+  static unsigned long sirenOnStartTime = 0;
 
-    unsigned long elapsed = millis() - alarmStartTime;
-    if (elapsed >= (delay_sirena * 1000UL)) {
-      digitalWrite(PIN_SIREN, HIGH);
-    } else {
-      digitalWrite(PIN_SIREN, LOW); // Asegurar apagada durante la espera
-      static unsigned long lastLog = 0;
-      if (millis() - lastLog > 5000) {
-        DVL_PRINT("Esperando retardo sirena... faltan: ");
-        DVL_PRINTLN((delay_sirena * 1000UL - elapsed) / 1000);
-        lastLog = millis();
+  if (en_pivot) {
+    if (isAlarm || alarmLatched) {
+      if (alarmStartTime == 0) {
+        alarmStartTime = millis();
+        if (alarmStartTime == 0)
+          alarmStartTime = 1; // Asegurar que no sea 0
+        DVL_PRINTLN("--- ALARMA DETECTADA ---");
+        DVL_PRINT("Retardo configurado (seg): ");
+        DVL_PRINTLN(delay_sirena);
       }
+
+      unsigned long elapsed = millis() - alarmStartTime;
+
+      // Si ya está enclavada, o si pasó el tiempo de retardo
+      if (alarmLatched || (elapsed >= (delay_sirena * 1000UL))) {
+        if (!alarmLatched) {
+          alarmLatched = true;
+          sirenOnStartTime = millis();
+          if (sirenOnStartTime == 0)
+            sirenOnStartTime = 1;
+          DVL_PRINTLN("--- SIRENA ACTIVADA (ENCLAVADA) ---");
+        }
+
+        // Verificar tiempo de duración (timeout)
+        if (siren_duration > 0 &&
+            (millis() - sirenOnStartTime >= siren_duration * 1000UL)) {
+          digitalWrite(PIN_SIREN, LOW);
+        } else {
+          digitalWrite(PIN_SIREN, HIGH);
+        }
+      } else {
+        // En periodo de retardo
+        digitalWrite(PIN_SIREN, LOW); // Asegurar apagada durante la espera
+        static unsigned long lastLog = 0;
+        if (millis() - lastLog > 5000) {
+          DVL_PRINT("Esperando retardo sirena... faltan: ");
+          DVL_PRINTLN((delay_sirena * 1000UL - elapsed) / 1000);
+          lastLog = millis();
+        }
+      }
+    } else {
+      // No hay alarma y no está enclavada
+      alarmStartTime = 0;
+      digitalWrite(PIN_SIREN, LOW);
     }
   } else {
-    if (alarmStartTime != 0) {
+    // Sistema deshabilitado o PIVOFF enviado
+    if (alarmStartTime != 0 || alarmLatched) {
       DVL_PRINTLN("--- ALARMA DESACTIVADA O SISTEMA DESHABILITADO ---");
     }
     alarmStartTime = 0;
+    alarmLatched = false;
     digitalWrite(PIN_SIREN, LOW);
   }
 
@@ -578,7 +608,7 @@ void loop() {
 
     esp_task_wdt_reset();
 
-    if (en_pivot && !isAlarm && pivotSentAtLeastOnce &&
+    if (en_pivot && !isAlarm && !alarmLatched && pivotSentAtLeastOnce &&
         (millis() - lastChangeTime > 3000)) {
       DVL_PRINTLN("Deep Sleep...");
       esp_sleep_enable_timer_wakeup(300ULL * 1000000ULL);
