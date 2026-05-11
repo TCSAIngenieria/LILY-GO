@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V01.01.01-AGD_Pivots";
+String versionado = "V02.02.03-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -77,6 +77,8 @@ extern uint en_serial;
 extern uint en_modbus;
 extern uint en_ble;
 extern uint en_adc;
+extern uint en_pivot; // Sistema Pivot/Alarma habilitado
+extern unsigned long delay_sirena;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -201,6 +203,7 @@ void setup() {
   en_modbus = 0;
   en_ble = 0;
   en_adc = preferences.getUInt("adc", 0);
+  en_pivot = preferences.getUInt("pivot", 0);
   preferences.end();
 
   // --- Contador de reinicios y Lectura de AP Mode ---
@@ -213,6 +216,7 @@ void setup() {
   rebootCount = preferences.getULong("reboot", 0);
   rebootCount++;
   preferences.putULong("reboot", rebootCount);
+  delay_sirena = preferences.getULong("dsir", 300);
   preferences.end();
 
   /*CONFIGURACION WIFI*/
@@ -432,8 +436,12 @@ void loop() {
     }
   }
 
-  // ---- L�GICA PIVOT (ALARMAS Y DEEP SLEEP) ----
-  bool isAlarm = (stableIn1 == HIGH && stableIn2 == HIGH);
+  // ---- LGICA PIVOT (ALARMAS Y DEEP SLEEP) ----
+  bool isAlarm = false;
+  if (en_pivot) {
+    isAlarm = (stableIn1 == HIGH && stableIn2 == HIGH);
+  }
+
   static bool wasAlarm = false;
   static bool pivotSentAtLeastOnce = false;
 
@@ -443,9 +451,9 @@ void loop() {
         "Cambio de estado detectado y estable (3s). Enviando reporte...");
     if (mqtt.connected()) {
       unsigned long numPkt = obtener_y_avanzar_numero_paquete();
-      String jsonPivot =
-          create_mqtt_json_pivot(ident, printCurrentTime(), stableIn1,
-                                 stableIn2, isAlarm ? 1 : 0, numPkt);
+      String jsonPivot = create_mqtt_json_pivot(
+          ident, printCurrentTime(), stableIn1, stableIn2,
+          digitalRead(PIN_SIREN), (int)en_pivot, numPkt);
       if (publish_mqtt_json(topic1 + "/PIVOT", jsonPivot)) {
         mqttUltimaConexionOK = millis();
         pivotSentAtLeastOnce = true;
@@ -453,9 +461,35 @@ void loop() {
     }
   }
 
-  if (isAlarm) {
-    digitalWrite(PIN_SIREN, HIGH);
+  // Sirena: solo actuar si el sistema Pivot esta habilitado
+  static unsigned long alarmStartTime = 0;
+  if (en_pivot && isAlarm) {
+    if (alarmStartTime == 0) {
+      alarmStartTime = millis();
+      if (alarmStartTime == 0)
+        alarmStartTime = 1; // Asegurar que no sea 0
+      DVL_PRINTLN("--- ALARMA DETECTADA ---");
+      DVL_PRINT("Retardo configurado (seg): ");
+      DVL_PRINTLN(delay_sirena);
+    }
+
+    unsigned long elapsed = millis() - alarmStartTime;
+    if (elapsed >= (delay_sirena * 1000UL)) {
+      digitalWrite(PIN_SIREN, HIGH);
+    } else {
+      digitalWrite(PIN_SIREN, LOW); // Asegurar apagada durante la espera
+      static unsigned long lastLog = 0;
+      if (millis() - lastLog > 5000) {
+        DVL_PRINT("Esperando retardo sirena... faltan: ");
+        DVL_PRINTLN((delay_sirena * 1000UL - elapsed) / 1000);
+        lastLog = millis();
+      }
+    }
   } else {
+    if (alarmStartTime != 0) {
+      DVL_PRINTLN("--- ALARMA DESACTIVADA O SISTEMA DESHABILITADO ---");
+    }
+    alarmStartTime = 0;
     digitalWrite(PIN_SIREN, LOW);
   }
 
@@ -503,9 +537,9 @@ void loop() {
 
     // Reporte Peridico del Pivot (o al despertar)
     unsigned long numPktPivot = obtener_y_avanzar_numero_paquete();
-    String jsonPivot =
-        create_mqtt_json_pivot(ident, printCurrentTime(), stableIn1, stableIn2,
-                               isAlarm ? 1 : 0, numPktPivot);
+    String jsonPivot = create_mqtt_json_pivot(
+        ident, printCurrentTime(), stableIn1, stableIn2, digitalRead(PIN_SIREN),
+        (int)en_pivot, numPktPivot);
     if (mqtt.connected()) {
       if (publish_mqtt_json(topic1 + "/PIVOT", jsonPivot)) {
         mqttUltimaConexionOK = millis();
@@ -544,7 +578,7 @@ void loop() {
 
     esp_task_wdt_reset();
 
-    if (!isAlarm && pivotSentAtLeastOnce &&
+    if (en_pivot && !isAlarm && pivotSentAtLeastOnce &&
         (millis() - lastChangeTime > 3000)) {
       DVL_PRINTLN("Deep Sleep...");
       esp_sleep_enable_timer_wakeup(300ULL * 1000000ULL);

@@ -20,6 +20,8 @@ uint en_serial = 0;
 uint en_modbus = 0;
 uint en_ble = 0;
 uint en_adc = 0;
+uint en_pivot = 0;
+unsigned long delay_sirena = 300;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
@@ -99,6 +101,37 @@ String procesarComando(String comando) {
     en_adc = preferences.getUInt("adc", 0);
     preferences.end();
     respuesta = "EN_ADC=" + String(en_adc);
+
+  } else if (comando == "DVL+PIVON") {
+    en_pivot = 1;
+    preferences.begin("enables", false);
+    preferences.putUInt("pivot", 1);
+    preferences.end();
+    respuesta = ">> SISTEMA PIVOT HABILITADO";
+
+  } else if (comando == "DVL+PIVOFF") {
+    en_pivot = 0;
+    preferences.begin("enables", false);
+    preferences.putUInt("pivot", 0);
+    preferences.end();
+    respuesta = ">> SISTEMA PIVOT DESHABILITADO (sirena apagada)";
+
+  } else if (comando.startsWith("DVL+SDSIR=")) {
+    String sdsir_s = comando.substring(10);
+    delay_sirena = strtoul(sdsir_s.c_str(), NULL, 10);
+    preferences.begin("device", false);
+    preferences.putULong("dsir", delay_sirena);
+    preferences.end();
+    respuesta = "RETRASO SIRENA SETEADO OK (segundos): " + String(delay_sirena);
+
+  } else if (comando == "DVL+QDSIR") {
+    respuesta = "DSIR=" + String(delay_sirena);
+
+  } else if (comando == "DVL+QPIV") {
+    preferences.begin("enables", true);
+    en_pivot = preferences.getUInt("pivot", 0);
+    preferences.end();
+    respuesta = "PIVOT=" + String(en_pivot);
 
   } else {
     respuesta = "[ERR] Comando no reconocido o deshabilitado.";

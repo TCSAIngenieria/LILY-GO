@@ -118,13 +118,14 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
 }
 
 String create_mqtt_json_pivot(String ident, String fechayhora, int di1,
-                              int di2, int sirena, unsigned long index) {
+                              int di2, int sirena, int pivot_enabled, unsigned long index) {
   StaticJsonDocument<256> doc;
   doc["Ident"] = ident;
   doc["Date"] = fechayhora;
   doc["DI1"] = di1;
   doc["DI2"] = di2;
   doc["Sirena"] = sirena;
+  doc["PivotEnabled"] = pivot_enabled;
   doc["index"] = index;
   
   return finalizeJson(doc);

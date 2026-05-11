@@ -18,7 +18,7 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
                             float adc1, float adc2);
 
 String create_mqtt_json_pivot(String ident, String fechayhora, int di1,
-                              int di2, int sirena, unsigned long index);
+                              int di2, int sirena, int pivot_enabled, unsigned long index);
 
 String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String latitud, String longitud,
