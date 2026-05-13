@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V02.03.04-AGD_Pivots";
+String versionado = "V02.04.05-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -64,6 +64,8 @@ const unsigned long MQTT_TIMEOUT = 300000; // 5 minutos
 
 unsigned long lastMqttResubscribe = 0;
 const unsigned long mqttResubscribeInterval = 10000; // cada 10 segundos
+unsigned long lastTimeSyncAttempt = 0;
+const unsigned long timeSyncInterval = 30000; // Intentar sincronizar cada 30 segundos
 
 // Variables generales
 String ident = "";
@@ -80,6 +82,7 @@ extern uint en_adc;
 extern uint en_pivot; // Sistema Pivot/Alarma habilitado
 extern unsigned long delay_sirena;
 extern unsigned long siren_duration;
+extern unsigned long deep_sleep_time;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -219,6 +222,7 @@ void setup() {
   preferences.putULong("reboot", rebootCount);
   delay_sirena = preferences.getULong("dsir", 300);
   siren_duration = preferences.getULong("tsir", 300);
+  deep_sleep_time = preferences.getULong("ds_time", 300);
   preferences.end();
 
   /*CONFIGURACION WIFI*/
@@ -347,9 +351,10 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // 1. Manejo de conexi�n f�sica (WiFi o GSM)
+  // 1. Manejo de conexin fsica (WiFi o GSM)
+  bool conexionFisicaOK = false;
   if (WiFi.status() == WL_CONNECTED) {
-    faseGPRS_WIFI = true;
+    conexionFisicaOK = true;
   } else {
     // Si no hay WiFi, intentamos GSM/GPRS
     updateNetworkConnection(modem);
@@ -361,11 +366,12 @@ void loop() {
       }
     }
     if (modem.isGprsConnected()) {
-      faseGPRS_WIFI = true;
+      conexionFisicaOK = true;
     }
   }
+  faseGPRS_WIFI = conexionFisicaOK;
 
-  // 2. Captura de informaci�n del modem (una sola vez)
+  // 2. Captura de informacin del modem (una sola vez)
   if (modemIMEI == "" && modem.getSimStatus() == 1) {
     modemIMEI = modem.getIMEI();
     modemIMSI = modem.getIMSI();
@@ -390,6 +396,17 @@ void loop() {
     lastReconnectAttempt = now;
     if (mqttConnect()) {
       lastReconnectAttempt = 0;
+      contadorErroresModem = 0; // Resetear contador al conectar exitosamente
+    } else {
+      contadorErroresModem++;
+      DVL_PRINTF("Fallo intento MQTT %d/%d\n", contadorErroresModem,
+                 limiteErroresModem);
+      if (contadorErroresModem >= limiteErroresModem) {
+        DVL_PRINTLN(
+            "!!! Limite de fallos MQTT alcanzado. Reiniciando Modem... !!!");
+        modemRestart();
+        contadorErroresModem = 0;
+      }
     }
   }
 
@@ -532,15 +549,23 @@ void loop() {
     // El ESP32 sale del Deep Sleep con time() = 0, por lo que debemos
     // obtener la hora via NTP (WiFi o GSM) antes de generar timestamps.
     if (wasFirst && !isTimeSet()) {
-      DVL_PRINTLN("[Hora] Reloj no sincronizado. Intentando sincronizar...");
-      if (WiFi.status() == WL_CONNECTED) {
-        updateClockFromNTP_wifi();
-      } else if (modem.isGprsConnected()) {
-        updateClockFromNTP(modem);
+      if (now - lastTimeSyncAttempt > timeSyncInterval) {
+        lastTimeSyncAttempt = now;
+        DVL_PRINTLN("[Hora] Reloj no sincronizado. Intentando sincronizar...");
+        if (WiFi.status() == WL_CONNECTED) {
+          updateClockFromNTP_wifi();
+        } else if (modem.isGprsConnected()) {
+          updateClockFromNTP(modem);
+        }
       }
+      
       // Si aun no hay hora valida, posponer el reporte hasta el proximo ciclo
       if (!isTimeSet()) {
-        DVL_PRINTLN("[Hora] Sin hora valida aun. Reporte pospuesto.");
+        static unsigned long lastWarn = 0;
+        if (now - lastWarn > 5000) {
+          DVL_PRINTLN("[Hora] Sin hora valida aun. Reporte pospuesto.");
+          lastWarn = now;
+        }
         goto skip_publish;
       }
       DVL_PRINTLN("[Hora] Reloj sincronizado correctamente.");
@@ -576,7 +601,11 @@ void loop() {
         pivotSentAtLeastOnce = true;
       }
     } else {
-      flash_save_packet(jsonPivot.c_str());
+      if (flash_save_packet(jsonPivot.c_str())) {
+        DVL_PRINTLN("Reporte Pivot guardado en flash (offline).");
+        pivotSentAtLeastOnce =
+            true; // Permitir Deep Sleep aunque estemos offline
+      }
     }
 
     // SI ES EL PRIMER ENVO (AL DESPERTAR), TAMBIN ENVIAMOS KEEP ALIVE
@@ -608,10 +637,10 @@ void loop() {
 
     esp_task_wdt_reset();
 
-    if (en_pivot && !isAlarm && !alarmLatched && pivotSentAtLeastOnce &&
-        (millis() - lastChangeTime > 3000)) {
+    if (deep_sleep_time > 0 && en_pivot && !isAlarm && !alarmLatched &&
+        pivotSentAtLeastOnce && (millis() - lastChangeTime > 3000)) {
       DVL_PRINTLN("Deep Sleep...");
-      esp_sleep_enable_timer_wakeup(300ULL * 1000000ULL);
+      esp_sleep_enable_timer_wakeup((uint64_t)deep_sleep_time * 1000000ULL);
       uint64_t wakeMask = 0;
       if (stableIn1 == LOW)
         wakeMask |= (1ULL << PIN_IN_1);

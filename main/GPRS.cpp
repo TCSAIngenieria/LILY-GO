@@ -184,8 +184,8 @@ void updateNetworkConnection(TinyGsm &modem) {
   delay(1000);
   isModemConnected = modem.isNetworkConnected();
 
-  DVL_PRINT("Modo conexion: ");
-  DVL_PRINT(networkModes[currentModeIndex]);
+  DVL_PRINT("Intento Conexion: ");
+  DVL_PRINT(getGSMTech());
   DVL_PRINT(" - Conectado? ");
   DVL_PRINTLN(isModemConnected ? "SI" : "NO");
 

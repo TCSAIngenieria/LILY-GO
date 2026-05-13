@@ -73,6 +73,8 @@ void flash_init() {
   // Iniciar SPIFFS
   if (!SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED)) {
     DVL_PRINTLN("Error mount SPIFFS");
+  } else {
+    DVL_PRINTF("SPIFFS Montado. Total: %u bytes, Usado: %u bytes\n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
   }
   // Iniciar Preferences
   if (prefs.begin("flash_buf", true)) {  // lectura

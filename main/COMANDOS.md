@@ -62,6 +62,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+PIVOFF` | Deshabilita el sistema, apaga sirena y limpia el enclavamiento. | `DVL+PIVOFF` |
 | `DVL+SDSIR=<seg>` | Configura el retardo antes de activar la sirena (segundos). | `DVL+SDSIR=300` |
 | `DVL+STSIR=<seg>` | Configura el tiempo mǭximo de sirena encendida (0=infinito). | `DVL+STSIR=60` |
+| `DVL+SDEEP=<seg>` | Configura el intervalo de Deep Sleep (0=deshabilitado). | `DVL+SDEEP=300` |
 
 ## Comandos de Consulta (Query)
 
@@ -86,3 +87,4 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QPIV` | Consulta si el sistema PIVOT estǭ habilitado. | `PIVOT=1` |
 | `DVL+QDSIR` | Consulta el retardo de activacin de la sirena. | `DSIR=300` |
 | `DVL+QTSIR` | Consulta el tiempo de duracin de la sirena. | `TSIR=60` |
+| `DVL+QDEEP` | Consulta el intervalo de Deep Sleep. | `DEEP=300` |

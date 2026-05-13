@@ -23,6 +23,7 @@ uint en_adc = 0;
 uint en_pivot = 0;
 unsigned long delay_sirena = 300;
 unsigned long siren_duration = 0;
+unsigned long deep_sleep_time = 300;
 #define PIN_IN_1 13
 #define PIN_IN_2 14
 
@@ -146,6 +147,17 @@ String procesarComando(String comando) {
 
   } else if (comando == "DVL+QTSIR") {
     respuesta = "TSIR=" + String(siren_duration);
+
+  } else if (comando.startsWith("DVL+SDEEP=")) {
+    String sdeep_s = comando.substring(10);
+    deep_sleep_time = strtoul(sdeep_s.c_str(), NULL, 10);
+    preferences.begin("device", false);
+    preferences.putULong("ds_time", deep_sleep_time);
+    preferences.end();
+    respuesta = "DEEP SLEEP TIME SETEADO OK (segundos): " + String(deep_sleep_time);
+
+  } else if (comando == "DVL+QDEEP") {
+    respuesta = "DEEP=" + String(deep_sleep_time);
 
   } else if (comando == "DVL+QPIV") {
     preferences.begin("enables", true);
