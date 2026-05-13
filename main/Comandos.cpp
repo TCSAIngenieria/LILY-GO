@@ -165,6 +165,11 @@ String procesarComando(String comando) {
     preferences.end();
     respuesta = "PIVOT=" + String(en_pivot);
 
+  } else if (comando == "DVL+PASSON") {
+    extern bool passthroughMode;
+    passthroughMode = true;
+    respuesta = "MODO PASSTHROUGH ACTIVADO";
+
   } else {
     respuesta = "[ERR] Comando no reconocido o deshabilitado.";
   }

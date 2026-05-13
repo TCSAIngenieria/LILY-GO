@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V02.04.05-AGD_Pivots";
+String versionado = "V02.05.01-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -65,7 +65,9 @@ const unsigned long MQTT_TIMEOUT = 300000; // 5 minutos
 unsigned long lastMqttResubscribe = 0;
 const unsigned long mqttResubscribeInterval = 10000; // cada 10 segundos
 unsigned long lastTimeSyncAttempt = 0;
-const unsigned long timeSyncInterval = 30000; // Intentar sincronizar cada 30 segundos
+const unsigned long timeSyncInterval =
+    30000; // Intentar sincronizar cada 30 segundos
+bool passthroughMode = false;
 
 // Variables generales
 String ident = "";
@@ -351,6 +353,30 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
+  if (passthroughMode) {
+    DVL_PRINTLN("\n[PASSTHROUGH] Modo transparente ACTIVADO.");
+    DVL_PRINTLN("[PASSTHROUGH] Envie comandos AT directamente al modem.");
+    DVL_PRINTLN("[PASSTHROUGH] Para salir, envie: DVL+PASSOFF\n");
+
+    while (passthroughMode) {
+      if (Serial.available()) {
+        String input = Serial.readStringUntil('\n');
+        input.trim();
+        if (input == "DVL+PASSOFF") {
+          DVL_PRINTLN("\n[PASSTHROUGH] Desactivando y reiniciando...");
+          delay(500);
+          ESP.restart();
+        } else if (input.length() > 0) {
+          SerialAT.println(input);
+        }
+      }
+      if (SerialAT.available()) {
+        Serial.write(SerialAT.read());
+      }
+      esp_task_wdt_reset();
+    }
+  }
+
   // 1. Manejo de conexin fsica (WiFi o GSM)
   bool conexionFisicaOK = false;
   if (WiFi.status() == WL_CONNECTED) {
@@ -558,7 +584,7 @@ void loop() {
           updateClockFromNTP(modem);
         }
       }
-      
+
       // Si aun no hay hora valida, posponer el reporte hasta el proximo ciclo
       if (!isTimeSet()) {
         static unsigned long lastWarn = 0;
