@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V02.05.01-AGD_Pivots";
+String versionado = "V02.05.03-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -358,6 +358,9 @@ void loop() {
     DVL_PRINTLN("[PASSTHROUGH] Envie comandos AT directamente al modem.");
     DVL_PRINTLN("[PASSTHROUGH] Para salir, envie: DVL+PASSOFF\n");
 
+    // Deshabilitar el watchdog para que no reinicie durante el debug manual
+    esp_task_wdt_delete(NULL);
+
     while (passthroughMode) {
       if (Serial.available()) {
         String input = Serial.readStringUntil('\n');
@@ -373,7 +376,6 @@ void loop() {
       if (SerialAT.available()) {
         Serial.write(SerialAT.read());
       }
-      esp_task_wdt_reset();
     }
   }
 
@@ -448,7 +450,17 @@ void loop() {
       if (packet == nullptr)
         break;
       last_flash_read = now;
-      if (publish_mqtt_json(topic1, String(packet))) {
+      String packetStr = String(packet);
+      String finalTopic = topic1;
+
+      // Determinar el topic segun el contenido del JSON
+      if (packetStr.indexOf("\"DI1\":") != -1) {
+        finalTopic += "/PIVOT";
+      } else if (packetStr.indexOf("\"adc0\":") != -1) {
+        finalTopic += "/ADC";
+      }
+
+      if (publish_mqtt_json(finalTopic, packetStr)) {
         flash_mark_packet_sent();
         mqttUltimaConexionOK = millis();
       } else {
