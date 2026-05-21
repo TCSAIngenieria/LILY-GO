@@ -119,6 +119,7 @@ String create_mqtt_json_sensor(String topic, String ident,
                                float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<256> doc;
+  doc["topic"] = topic;
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
   doc["date"] = fechayhora;
@@ -140,6 +141,7 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
                                String latitud, String longitud, float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
+  doc["topic"] = topic;
   doc["ident"] = ident;
   doc["S0"] = S0;
   doc["S1"] = S1;
@@ -174,6 +176,7 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
                                String latitud, String longitud, float Vbateria,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
+  doc["topic"] = topic;
   doc["ident"] = ident;
 
   // Recorrer las consultas configuradas
@@ -197,9 +200,10 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
   return String(payload);
 }
 
-String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
+String create_mqtt_json_adc(String topic, String ident, String fechayhora, float adc0,
                             float adc1, float adc2) {
   StaticJsonDocument<256> doc;
+  doc["topic"] = topic;
   doc["ident"] = ident;
   doc["status"] = "adc-values";
   doc["date"] = fechayhora;
@@ -212,7 +216,7 @@ String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
   return String(payload);
 }
 
-String create_mqtt_json_keepalive(String ident, String fechayhora,
+String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
                                   String latitud, String longitud,
                                   String versionado,
                                   unsigned long rebootCount,
@@ -220,6 +224,7 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String imei, String imsi, String iccid,
                                   String rsrq, String rsrp, String rssi) {
   StaticJsonDocument<512> doc;
+  doc["topic"] = topic;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
@@ -247,6 +252,7 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
                             float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<2048> doc;
   
+  doc["topic"] = topic;
   if (data.name.length() > 0) doc["name"] = data.name;
   if (data.tag_id.length() > 0) doc["tag_id"] = data.tag_id;
   if (data.uuid.length() > 0) doc["UUID"] = data.uuid;

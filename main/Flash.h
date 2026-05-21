@@ -20,6 +20,7 @@ bool flash_buffer_empty();
 // Variables accesibles desde el main
 extern String ultimaLat;
 extern String ultimaLon;
+extern String apn;
 
 // Guarda un paquete JSON en el buffer flash (no bloqueante)
 bool flash_save_packet(const char* json);

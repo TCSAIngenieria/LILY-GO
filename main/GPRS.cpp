@@ -34,9 +34,75 @@ void modemPowerOff() {
 }
 
 void modemRestart() {
-  modemPowerOff();
-  delay(1000);
+  DVL_PRINTLN("[MODEM] Iniciando reinicio de hardware...");
+  if (isModemOn()) {
+    DVL_PRINTLN("[MODEM] Apagando módem...");
+    modemPowerOff();
+    delay(2000);
+  } else {
+    DVL_PRINTLN("[MODEM] El módem no respondía, omitiendo apagado seguro.");
+  }
+  asegurarModemEncendido();
+}
+
+bool isModemOn() {
+  // Limpiamos el buffer del puerto serie
+  while (SerialAT.available()) {
+    SerialAT.read();
+  }
+
+  // Hacemos hasta 3 intentos rápidos de enviar AT
+  for (int i = 0; i < 3; i++) {
+    SerialAT.println("AT");
+    unsigned long start = millis();
+    String response = "";
+    while (millis() - start < 400) {
+      if (SerialAT.available()) {
+        char c = SerialAT.read();
+        response += c;
+        if (response.indexOf("OK") != -1) {
+          return true;
+        }
+      }
+    }
+    delay(100);
+  }
+  return false;
+}
+
+void asegurarModemEncendido() {
+  DVL_PRINTLN("[MODEM] Verificando estado del módem...");
+  if (isModemOn()) {
+    DVL_PRINTLN("[MODEM] El módem ya responde (está encendido).");
+    return;
+  }
+
+  DVL_PRINTLN("[MODEM] El módem no responde. Intentando encender (Toggle 1)...");
   modemPowerOn();
+
+  // Esperar a que arranque y verificar
+  unsigned long start = millis();
+  while (millis() - start < 4500) {
+    if (isModemOn()) {
+      DVL_PRINTLN("[MODEM] Módem encendido exitosamente (Toggle 1).");
+      return;
+    }
+    delay(500);
+  }
+
+  DVL_PRINTLN("[MODEM] Sigue sin responder. Posiblemente estaba encendido pero colgado y el primer Toggle lo apagó. Intentando Toggle 2...");
+  modemPowerOn();
+
+  start = millis();
+  while (millis() - start < 4500) {
+    if (isModemOn()) {
+      DVL_PRINTLN("[MODEM] Módem encendido exitosamente (Toggle 2).");
+      return;
+    }
+    delay(500);
+  }
+
+  DVL_PRINTLN("[MODEM] ERROR: No se pudo establecer comunicación con el módem.");
 }
 
 void initSD() {
@@ -185,7 +251,7 @@ void updateNetworkConnection(TinyGsm &modem) {
   isModemConnected = modem.isNetworkConnected();
 
   DVL_PRINT("Modo conexion: ");
-  DVL_PRINT(networkModes[currentModeIndex]);
+  DVL_PRINT(getGSMTech());
   DVL_PRINT(" - Conectado? ");
   DVL_PRINTLN(isModemConnected ? "SI" : "NO");
 

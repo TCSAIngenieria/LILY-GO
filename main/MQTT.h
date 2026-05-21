@@ -37,10 +37,10 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
                             String latitud, String longitud, float Vbateria,
                             float Vprincipal, unsigned long numeroPaquete);
 
-String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
+String create_mqtt_json_adc(String topic, String ident, String fechayhora, float adc0,
                             float adc1, float adc2);
 
-String create_mqtt_json_keepalive(String ident, String fechayhora,
+String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
                                   String latitud, String longitud,
                                   String versionado, unsigned long rebootCount,
                                   String connType, String connDetail,

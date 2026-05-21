@@ -10,6 +10,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
 | `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http://midominio.com/firmware.bin` |
+| `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN=igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
 
@@ -19,6 +20,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+EN_SERIAL=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del puerto serial secundario. | `DVL+EN_SERIAL=1` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (1) o deshabilita (0) el módulo Modbus. Al habilitar Modbus, se deshabilita Serial. | `DVL+EN_MODBUS=1` |
 | `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Al habilitar, deshabilita otros sensores. | `DVL+EN_BLE=1` |
+| `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
 | `DVL+EXP_RESET` | Reinicia la placa expansora (ciclo de energía). | `DVL+EXP_RESET` |
 
 ## Comandos de Modbus
@@ -71,5 +73,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QFINI` | Muestra el marcador de inicio actual. | `START_MARKER=DATA,` |
 | `DVL+QFFIN` | Muestra el marcador de fin actual. | `END_MARKER=\r` |
 | `DVL+QPARSE` | Muestra el separador configurado. | `SEPARATOR=,` |
+| `DVL+QAPN` | Muestra el APN configurado para la conexión GPRS. | `APN=igprs.claro.com.ar` |
+| `DVL+QEN_ADC` | Consulta si el reporte independiente del ADC está habilitado. | `EN_ADC=1` |
 | `DVL+QLAT` | Muestra la última latitud registrada. | `LAT=-34.60` |
 | `DVL+QLONG` | Muestra la última longitud registrada. | `LONG=-58.38` |

@@ -11,6 +11,7 @@ Preferences prefs;
 // Variables globales
 String ultimaLat = "-33.123456";
 String ultimaLon = "-64.123456";
+String apn = "igprs.claro.com.ar";
 extern String ident;
 
 String spublishInterval;
@@ -29,6 +30,7 @@ void lectura_flash() {
   ultimaLat = leer_de_flash("lat");
   ultimaLon = leer_de_flash("lon");
   spublishInterval = leer_de_flash("time");
+  apn = leer_de_flash("apn", "igprs.claro.com.ar");
   if (spublishInterval != "N/A" && spublishInterval.length() > 0) {
     unsigned long temp = strtoul(spublishInterval.c_str(), NULL, 10);
     if (temp > 0) {
@@ -40,6 +42,8 @@ void lectura_flash() {
   DVL_PRINTLN(ultimaLat);
   DVL_PRINT("ultima Longitud guardada: ");
   DVL_PRINTLN(ultimaLon);
+  DVL_PRINT("ultimo APN guardado: ");
+  DVL_PRINTLN(apn);
   DVL_PRINT("ultima ultimo publish_time guardado: ");
   DVL_PRINTLN(spublishInterval);
   DVL_PRINT(publishInterval);

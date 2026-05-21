@@ -1,0 +1,3 @@
+# Arduino build folder
+main/build/
+*.local.txt

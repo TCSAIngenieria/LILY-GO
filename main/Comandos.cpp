@@ -141,6 +141,14 @@ String procesarComando(String comando) {
     publishInterval = strtoul(publishInterval_s.c_str(), NULL, 10);
     respuesta = "TIEMPO SETEADO OK";
 
+    /* COMANDO APN */
+  } else if (comando.startsWith("DVL+SAPN=")) {
+    String nuevoAPN = comando.substring(9);
+    nuevoAPN.trim();
+    guardar_en_flash("apn", nuevoAPN);
+    apn = nuevoAPN;
+    respuesta = "APN SETEADO OK";
+
     /* COMANDO ID */
   } else if (comando.startsWith("DVL+ID=")) {
     String ident_s = comando.substring(7);
@@ -390,6 +398,9 @@ String procesarComando(String comando) {
 
   } else if (comando == "DVL+QPARSE") {
     respuesta = "SEPARATOR=" + String(separator);
+
+  } else if (comando == "DVL+QAPN") {
+    respuesta = "APN=" + apn;
 
   } else if (comando == "DVL+QLAT") {
     respuesta = "LAT=" + ultimaLat;
