@@ -14,6 +14,7 @@
 #include <PubSubClient.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <ArduinoJson.h>
 
 #include "ADC.h"
 #include "BLE_MOKO.h"
@@ -49,7 +50,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V03.04.04";
+String versionado = "V03.05.15";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -84,7 +85,7 @@ Preferences preferences;
 extern String sensorValues[16];
 
 // Credenciales GPRS
-const char apn[] = "igprs.claro.com.ar"; // APN
+extern String apn;
 const char gprsUser[] = "";
 const char gprsPass[] = "";
 
@@ -109,6 +110,13 @@ const unsigned long tiempoLimiteGPS = 0UL * 60UL * 1000UL; // 1 minutos
 ///*Tiempo de actualizacion de Hora*/
 unsigned long ultimaActualizacionNTP = 0;
 const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
+
+/* Temporizadores para intentos de GPRS y NTP */
+unsigned long lastGprsConnectAttempt = 0;
+const unsigned long gprsConnectInterval = 10000; // 10 segundos
+
+unsigned long lastNtpSyncAttempt = 0;
+const unsigned long ntpSyncInterval = 10000; // 10 segundos
 
 /*Variables para reinicio de modem si no se inicia bien*/
 int contadorErroresModem = 0;
@@ -275,7 +283,7 @@ void setup() {
   /*ACA TENGO QUE PONER EL SENSOR QUE VOY A UTILIZAR*/
   sensor = new DS18B20();
 
-  modemPowerOn(); // Enciendo el modem celular
+  asegurarModemEncendido(); // Asegurar que el módem esté encendido y respondiendo a comandos AT
 
   static const esp_task_wdt_config_t wdt_config = {
       .timeout_ms = WDT_TIMEOUT * 1000,
@@ -494,27 +502,33 @@ void loop() {
       updateNetworkConnection(modem); // Conexion no bloqueante
 
       if (!modem.isGprsConnected()) {
-        DVL_PRINTLN("Intentando conectar GPRS...");
-        if (modem.gprsConnect(apn, gprsUser, gprsPass)) {
-          DVL_PRINTLN("GPRS conectado correctamente");
-          // MQTT Broker setup
-          mqtt.setServer(MQTT_BROKER.c_str(), 1883);
-          mqtt.setCallback(mqttCallback);
-        } else {
-          DVL_PRINTLN("Fallo al conectar GPRS");
+        if (millis() - lastGprsConnectAttempt >= gprsConnectInterval) {
+          lastGprsConnectAttempt = millis();
+          DVL_PRINTLN("Conectando a GPRS...");
+          if (modem.gprsConnect(apn.c_str(), gprsUser, gprsPass)) {
+            DVL_PRINTLN("GPRS conectado correctamente");
+            // MQTT Broker setup
+            mqtt.setServer(MQTT_BROKER.c_str(), 1883);
+            mqtt.setCallback(mqttCallback);
+          } else {
+            DVL_PRINTLN("Fallo al conectar GPRS");
+          }
         }
       }
 
       if (modem.isNetworkConnected() && modem.isGprsConnected()) {
 
         if (!relojActualizado) {
-          if (updateClockFromNTP(modem)) {
+          if (millis() - lastNtpSyncAttempt >= ntpSyncInterval) {
+            lastNtpSyncAttempt = millis();
+            if (updateClockFromNTP(modem)) {
 
-            relojActualizado = true;
-            ultimaActualizacionNTP = now;
-            // ... Utiliza la hora sincronizada ...
-          } else {
-            DVL_PRINTLN("Fallo la actualizacion de NTP");
+              relojActualizado = true;
+              ultimaActualizacionNTP = now;
+              // ... Utiliza la hora sincronizada ...
+            } else {
+              DVL_PRINTLN("Fallo la actualizacion de NTP");
+            }
           }
         } else if (now - ultimaActualizacionNTP >= intervaloNTP) {
           if (updateClockFromNTP(modem)) {
@@ -525,7 +539,10 @@ void loop() {
     }
   }
 
-  if (!mqtt.connected()) {
+  bool hasNetwork = (TINY_GSM_USE_WIFI && WiFi.status() == WL_CONNECTED) ||
+                    (TINY_GSM_USE_GPRS && modem.isNetworkConnected() && modem.isGprsConnected());
+
+  if (hasNetwork && !mqtt.connected()) {
     uint32_t t = millis();
     if (t - lastReconnectAttempt > 10000) {
       lastReconnectAttempt = t;
@@ -605,24 +622,37 @@ void loop() {
   if (now - last_flash_read > Packets_read_Interval) {
 
     while (!flash_buffer_empty()) {
-      const char *packet = flash_get_next_packet();
+      const char *packetStr = flash_get_next_packet();
       esp_task_wdt_reset();
 
-      if (packet == nullptr)
+      if (packetStr == nullptr)
         break;
+      
       last_flash_read = now;
-      String packetStr = String(packet);
-      if (WiFi.status() == WL_CONNECTED && mqtt.connected()) {
-        if (publish_mqtt_json(topic1, packetStr)) {
-          flash_mark_packet_sent();
-          mqttUltimaConexionOK =
-              millis(); //  Reset tambien con datos del buffer
+      String sendTopic = topic1;
+      StaticJsonDocument<2048> doc;
+      if (!deserializeJson(doc, packetStr) && doc.containsKey("topic")) {
+        sendTopic = doc["topic"].as<String>();
+      }
 
+      if (WiFi.status() == WL_CONNECTED && mqtt.connected()) {
+        if (publish_mqtt_json(sendTopic, String(packetStr))) {
+          flash_mark_packet_sent();
+          mqttUltimaConexionOK = millis(); //  Reset tambien con datos del buffer
         } else {
           break;
         }
+      } else if (modem.isGprsConnected() && modem.isNetworkConnected() &&
+                 mqtt.connected()) {
+        if (publish_mqtt_json(sendTopic, String(packetStr))) {
+          flash_mark_packet_sent();
+          mqttUltimaConexionOK = millis(); //  Reset tambien con datos del buffer
+        } else {
+          break;
+        }
+      } else {
+        break;
       }
-      break;
     }
   }
 
@@ -711,15 +741,16 @@ void loop() {
       DVL_PRINT("Modbus habilitado. Enviando dato por MQTT...");
 
       unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+      String topicModbus = topic1 + "/MODBUS";
       String jsonmodbus = create_mqtt_json_modbus(
-          topic1, ident, printCurrentTime(), ultimaLat, ultimaLon,
+          topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
           leer_tension_bateria(), leer_tension_principal(), numPkt);
 
       if (mqtt.connected()) {
-        if (topic1.length() == 0 || jsonmodbus.length() == 0) {
+        if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
           DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
-          if (publish_mqtt_json(topic1, jsonmodbus)) {
+          if (publish_mqtt_json(topicModbus, jsonmodbus)) {
             mqttUltimaConexionOK = millis();
           }
         }
@@ -781,10 +812,10 @@ void loop() {
 
     if (en_adc == 1) {
       DVL_PRINT("ADC habilitado. Enviando reporte ADC...");
-      String jsonadc = create_mqtt_json_adc(
-          ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
-
       String topicADC = topic1 + "/ADC";
+      String jsonadc = create_mqtt_json_adc(
+          topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
+
       if (mqtt.connected()) {
         if (publish_mqtt_json(topicADC, jsonadc)) {
           mqttUltimaConexionOK = millis();
@@ -830,7 +861,7 @@ void loop() {
     }
 
     String jsonKeepAlive = create_mqtt_json_keepalive(
-        ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
+        topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
         rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
         rsrp, rssi);
     if (mqtt.connected()) {

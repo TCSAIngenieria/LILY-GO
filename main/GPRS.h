@@ -27,6 +27,8 @@ extern HardwareSerial SerialAT;
 void modemPowerOn();
 void modemPowerOff();
 void modemRestart();
+bool isModemOn();
+void asegurarModemEncendido();
 void initSD();
 void printModemInfo(TinyGsm &modem, String &res);
 void updateNetworkConnection(TinyGsm &modem);
