@@ -30,6 +30,8 @@ uint en_serial;
 uint en_modbus;
 uint en_ble;
 uint en_adc;
+uint en_modem;
+uint en_gps;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
@@ -262,6 +264,38 @@ String procesarComando(String comando) {
     }
   }
 
+  /*comando para habilitar o deshabilitar MODEM*/
+  else if (comando.startsWith("DVL+EN_MODEM=")) {
+    String v = comando.substring(String("DVL+EN_MODEM=").length());
+    v.trim();
+    en_modem = (v == "1") ? 1 : 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("modem", en_modem);
+    preferences.end();
+    if (en_modem == 1) {
+      respuesta = ">> HABILITADO MODEM";
+    } else {
+      respuesta = ">> DESHABILITADO MODEM";
+    }
+  }
+
+  /*comando para habilitar o deshabilitar GPS*/
+  else if (comando.startsWith("DVL+EN_GPS=")) {
+    String v = comando.substring(String("DVL+EN_GPS=").length());
+    v.trim();
+    en_gps = (v == "1") ? 1 : 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("gps", en_gps);
+    preferences.end();
+    if (en_gps == 1) {
+      respuesta = ">> HABILITADO GPS";
+    } else {
+      respuesta = ">> DESHABILITADO GPS";
+    }
+  }
+
   /* comando para configurar tramas:
      DVL+MODBUS=idx,ID,FUNC,LONG
      idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
@@ -437,6 +471,18 @@ String procesarComando(String comando) {
     en_adc = preferences.getUInt("adc", 0);
     preferences.end();
     respuesta = "EN_ADC=" + String(en_adc);
+
+  } else if (comando == "DVL+QEN_MODEM") {
+    preferences.begin("enables", true);
+    en_modem = preferences.getUInt("modem", 1);
+    preferences.end();
+    respuesta = "EN_MODEM=" + String(en_modem);
+
+  } else if (comando == "DVL+QEN_GPS") {
+    preferences.begin("enables", true);
+    en_gps = preferences.getUInt("gps", 1);
+    preferences.end();
+    respuesta = "EN_GPS=" + String(en_gps);
 
   } else if (comando.startsWith("EXP+")) {
     // Reenvia el comando al puerto serial secundario

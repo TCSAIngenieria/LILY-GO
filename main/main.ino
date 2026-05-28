@@ -50,7 +50,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V03.05.15";
+String versionado = "V03.06.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -74,6 +74,8 @@ extern uint en_serial;
 extern uint en_modbus;
 extern uint en_ble;
 extern uint en_adc;
+extern uint en_modem;
+extern uint en_gps;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -208,6 +210,8 @@ void setup() {
   en_modbus = preferences.getUInt("modbus", 0);
   en_ble = preferences.getUInt("ble", 0);
   en_adc = preferences.getUInt("adc", 0);
+  en_modem = preferences.getUInt("modem", 1);
+  en_gps = preferences.getUInt("gps", 1);
   preferences.end();
 
   // --- Contador de reinicios y Lectura de AP Mode ---
@@ -283,7 +287,13 @@ void setup() {
   /*ACA TENGO QUE PONER EL SENSOR QUE VOY A UTILIZAR*/
   sensor = new DS18B20();
 
-  asegurarModemEncendido(); // Asegurar que el módem esté encendido y respondiendo a comandos AT
+  if (en_modem) {
+    asegurarModemEncendido(); // Asegurar que el módem esté encendido y respondiendo a comandos AT
+  } else {
+    DVL_PRINTLN("[MODEM] Deshabilitado por configuracion (EN_MODEM=0).");
+    TINY_GSM_USE_WIFI = true;
+    TINY_GSM_USE_GPRS = false;
+  }
 
   static const esp_task_wdt_config_t wdt_config = {
       .timeout_ms = WDT_TIMEOUT * 1000,
@@ -388,7 +398,13 @@ void loop() {
 
   // ========== FASE GPS ==========
   if (faseGPS) {
-    DVL_PRINTLN("Entrando a fase GPS bloqueante");
+    if (!en_modem || !en_gps) {
+      DVL_PRINTLN("GPS omitido (modem o GPS deshabilitados por configuracion).");
+      faseGPS = false;
+      faseGPRS_WIFI = true;
+      digitalWrite(LED_PIN, false);
+    } else {
+      DVL_PRINTLN("Entrando a fase GPS bloqueante");
     // Encendemos GPS si no esta encendido
     enableGPS();
     float lat, lon;
@@ -465,6 +481,7 @@ void loop() {
       faseGPS = false;
       faseGPRS_WIFI = true;
       digitalWrite(LED_PIN, false);
+    }
     }
   }
 
@@ -642,7 +659,7 @@ void loop() {
         } else {
           break;
         }
-      } else if (modem.isGprsConnected() && modem.isNetworkConnected() &&
+      } else if (en_modem && modem.isGprsConnected() && modem.isNetworkConnected() &&
                  mqtt.connected()) {
         if (publish_mqtt_json(sendTopic, String(packetStr))) {
           flash_mark_packet_sent();
@@ -840,14 +857,14 @@ void loop() {
       cType = "WIFI";
       cDetail = WiFi.SSID();
       rssi = String(WiFi.RSSI());
-    } else if (modem.isGprsConnected() || modem.isNetworkConnected()) {
+    } else if (en_modem && (modem.isGprsConnected() || modem.isNetworkConnected())) {
       cType = "GSM";
       cDetail = getGSMTech();
       getModemSignalInfo(modem, rsrq, rsrp, rssi);
     }
 
     // Consultar info unica del modem siempre, sin importar si usamos WiFi o GSM
-    if (modemIMEI.length() < 10 || modemICCID.length() < 10) {
+    if (en_modem && (modemIMEI.length() < 10 || modemICCID.length() < 10)) {
       static unsigned long lastModemQuery = 0;
       // Reintentar capturarlos maximo una vez cada 30 segundos para no saturar
       // ni bloquear si no hay chip
@@ -936,7 +953,7 @@ void actualizarLED() {
   }
 
   // 3. Conectado a GPRS -> Parpadeo singular y corto (1 latido cada 2 seg)
-  if (modem.isGprsConnected() || modem.isNetworkConnected()) {
+  if (en_modem && (modem.isGprsConnected() || modem.isNetworkConnected())) {
     if (seq >= 0 && seq < 200) { // 200ms prendido, 1800ms apagado
       digitalWrite(LED_PIN, HIGH);
     } else {
