@@ -321,6 +321,7 @@ void setup() {
 
   /*LECTURA ID*/
   ident = leer_de_flash("ident", "60000");
+  ident.toUpperCase();
 
   topic1 = "DVL/LILY-GO/" + ident;
   DVL_PRINT("TOPIC MQTT: ");
