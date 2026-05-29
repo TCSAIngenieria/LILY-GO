@@ -50,7 +50,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V04.01.01";
+String versionado = "V04.01.02";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -324,6 +324,7 @@ void setup() {
   ident.toUpperCase();
 
   topic1 = "DVL/LILY-GO/" + ident;
+  topic1.toUpperCase();
   DVL_PRINT("TOPIC MQTT: ");
   DVL_PRINTLN(topic1);
 
@@ -580,6 +581,7 @@ void loop() {
       for (const auto &bleData : bleDataList) {
         // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
+  topicBLE.toUpperCase();
         switch (bleData.frameType) {
         case 0x40:
           topicBLE += "/Device_Info";
@@ -694,6 +696,7 @@ void loop() {
         DVL_PRINT("Sensor habilitado. Enviando dato por MQTT...");
 
         String topicSensor = topic1 + "/DS18B20";
+  topicSensor.toUpperCase();
 
         String jsonsensor = create_mqtt_json_sensor(
             topicSensor, ident, valorStr, printCurrentTime(),
@@ -727,6 +730,7 @@ void loop() {
       DVL_PRINT("Serial habilitado. Enviando dato por MQTT...");
 
       String topicSerial = topic1 + "/SERIAL";
+  topicSerial.toUpperCase();
 
       String jsonserial = create_mqtt_json_serial(
           topic1, ident, sensorValues[0], sensorValues[1], sensorValues[2],
@@ -760,6 +764,7 @@ void loop() {
 
       unsigned long numPkt = obtener_y_avanzar_numero_paquete();
       String topicModbus = topic1 + "/MODBUS";
+  topicModbus.toUpperCase();
       String jsonmodbus = create_mqtt_json_modbus(
           topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
           leer_tension_bateria(), leer_tension_principal(), numPkt);
@@ -831,6 +836,7 @@ void loop() {
     if (en_adc == 1) {
       DVL_PRINT("ADC habilitado. Enviando reporte ADC...");
       String topicADC = topic1 + "/ADC";
+  topicADC.toUpperCase();
       String jsonadc = create_mqtt_json_adc(
           topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
 
