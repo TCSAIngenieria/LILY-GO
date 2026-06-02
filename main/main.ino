@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V02.05.03-AGD_Pivots";
+String versionado = "V02.06.01-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -550,6 +550,29 @@ void loop() {
         if (siren_duration > 0 &&
             (millis() - sirenOnStartTime >= siren_duration * 1000UL)) {
           digitalWrite(PIN_SIREN, LOW);
+
+          // --- Auto-deshabilitar el sistema tras timeout de sirena ---
+          DVL_PRINTLN("--- SIRENA TIMEOUT: DESHABILITANDO SISTEMA PIVOT ---");
+          en_pivot = 0;
+          alarmLatched = false;
+          alarmStartTime = 0;
+          sirenOnStartTime = 0;
+
+          // Persistir en flash
+          preferences.begin("enables", false);
+          preferences.putUInt("pivot", en_pivot);
+          preferences.end();
+
+          // Enviar reporte informando el cambio de estado
+          if (mqtt.connected()) {
+            unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+            String jsonPivot = create_mqtt_json_pivot(
+                ident, printCurrentTime(), stableIn1, stableIn2,
+                digitalRead(PIN_SIREN), (int)en_pivot, numPkt);
+            if (publish_mqtt_json(topic1 + "/PIVOT", jsonPivot)) {
+              mqttUltimaConexionOK = millis();
+            }
+          }
         } else {
           digitalWrite(PIN_SIREN, HIGH);
         }
