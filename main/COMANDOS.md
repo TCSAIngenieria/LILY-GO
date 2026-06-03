@@ -1,6 +1,6 @@
-# Comandos de Configuración LILY-GO
+# Comandos de Configuración NODEMCU
 
-Este documento detalla todos los comandos disponibles para configurar y controlar el dispositivo LILY-GO a través de la interfaz serial o MQTT.
+Este documento detalla todos los comandos disponibles para configurar y controlar el dispositivo NODEMCU a través de la interfaz serial o MQTT.
 
 ## Comandos de Configuración de Sistema
 
