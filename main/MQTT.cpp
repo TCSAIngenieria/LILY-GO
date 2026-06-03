@@ -36,8 +36,8 @@ boolean mqttConnect() {
     mqttActivo = true;
     mqttUltimaConexionOK = millis();
 
-    String topicFOTA = "DVL/LILY-GO/" + ident + "/FOTA";
-    String topicCMD = "DVL/LILY-GO/" + ident + "/COMANDOS";
+    String topicFOTA = "DVL/NODEMCU/" + ident + "/FOTA";
+    String topicCMD = "DVL/NODEMCU/" + ident + "/COMANDOS";
 
     mqtt.subscribe(topicFOTA.c_str());
     mqtt.subscribe(topicCMD.c_str());
@@ -84,7 +84,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
     DVL_PRINTLN(" Comando MQTT recibido: " + message);
 
     // Construir topic de respuesta
-    String topicRespuesta = "DVL/LILY-GO/" + ident + "/RESPUESTA";
+    String topicRespuesta = "DVL/NODEMCU/" + ident + "/RESPUESTA";
 
     String respuesta = procesarComando(message);
     // Publicar la respuesta en el topico

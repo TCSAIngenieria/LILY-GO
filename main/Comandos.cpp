@@ -3,7 +3,6 @@
 #include "DS18B20.h"
 #include "FOTA.h"
 #include "Flash.h"
-#include "GNSS.h" // Para setLatitude, setLongitude, setLocationValid
 #include "Modbus.h"
 #include <Preferences.h>
 #include "MQTT.h"
@@ -45,8 +44,6 @@ String procesarComando(String comando) {
     String nuevaLat = comando.substring(9);
     guardar_en_flash("lat", nuevaLat);
     ultimaLat = nuevaLat;
-    setLatitude(nuevaLat);
-    setLocationValid(true);
     respuesta = "RLAT_OK";
 
     /* COMANDO FILTRO ADC */
@@ -116,8 +113,6 @@ String procesarComando(String comando) {
     String nuevaLon = comando.substring(10);
     guardar_en_flash("lon", nuevaLon);
     ultimaLon = nuevaLon;
-    setLongitude(nuevaLon);
-    setLocationValid(true);
     respuesta = "RLONG_OK";
 
     /* COMANDOS TRAMA DATOS */
@@ -157,7 +152,7 @@ String procesarComando(String comando) {
     guardar_en_flash("ident", ident_s);
     ident = ident_s;
 
-    topic1 = "DVL/LILY-GO/" + ident;
+    topic1 = "DVL/NODEMCU/" + ident;
 
     // Desconectar de MQTT para forzar una revinculacion en el main loop
     // con el nuevo ID y nuevas subscripciones a los topicos (COMANDOS, FOTA)
@@ -266,34 +261,12 @@ String procesarComando(String comando) {
 
   /*comando para habilitar o deshabilitar MODEM*/
   else if (comando.startsWith("DVL+EN_MODEM=")) {
-    String v = comando.substring(String("DVL+EN_MODEM=").length());
-    v.trim();
-    en_modem = (v == "1") ? 1 : 0;
-
-    preferences.begin("enables", false);
-    preferences.putUInt("modem", en_modem);
-    preferences.end();
-    if (en_modem == 1) {
-      respuesta = ">> HABILITADO MODEM";
-    } else {
-      respuesta = ">> DESHABILITADO MODEM";
-    }
+    respuesta = ">> ERROR: EL EQUIPO NO DISPONE DE MODEM";
   }
 
   /*comando para habilitar o deshabilitar GPS*/
   else if (comando.startsWith("DVL+EN_GPS=")) {
-    String v = comando.substring(String("DVL+EN_GPS=").length());
-    v.trim();
-    en_gps = (v == "1") ? 1 : 0;
-
-    preferences.begin("enables", false);
-    preferences.putUInt("gps", en_gps);
-    preferences.end();
-    if (en_gps == 1) {
-      respuesta = ">> HABILITADO GPS";
-    } else {
-      respuesta = ">> DESHABILITADO GPS";
-    }
+    respuesta = ">> ERROR: EL EQUIPO NO DISPONE DE GPS";
   }
 
   /* comando para configurar tramas:
