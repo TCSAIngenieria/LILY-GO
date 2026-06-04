@@ -29,7 +29,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
-| `DVL+MODBUS=<idx>,<ID>,<FUNC>,<ADDR>,<QTY>` | Configura una trama Modbus en el índice `idx` (1-5). | `DVL+MODBUS=1,10,3,0,2`<br>(Lee 2 registros desde addr 0 del slave 10) |
+| `DVL+MODBUS=<idx>, <ID>, <FUNC>, <ADDR>, <QTY>` | Configura una trama Modbus en el índice `idx` (1-5). | `DVL+MODBUS=1,10,3,0,2`<br>(Lee 2 registros desde addr 0 del slave 10) |
 | `DVL+MODBUSCLR=<idx\|ALL>` | Borra una trama específica (`idx`) o todas (`ALL`). | `DVL+MODBUSCLR=1` o `DVL+MODBUSCLR=ALL` |
 
 ## Comandos de ADC (Conversor Analógico-Digital)
