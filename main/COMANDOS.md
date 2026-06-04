@@ -9,8 +9,8 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
-| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http://midominio.com/firmware.bin` |
-| `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN=igprs.claro.com.ar` |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http:// midominio.com/ firmware.bin` |
+| `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN= igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
 
@@ -29,7 +29,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
-| `DVL+MODBUS=<idx>,<ID>,<FUNC>,<ADDR>,<QTY>` | Configura una trama Modbus en el índice `idx` (1-5). | `DVL+MODBUS=1,10,3,0,2`<br>(Lee 2 registros desde addr 0 del slave 10) |
+| `DVL+MODBUS=<idx>,<ID>, <FUNC>,<ADDR>,<QTY>` | Configura una trama Modbus en el índice `idx` (1-5). | `DVL+MODBUS=1,10,3,0,2`<br>(Lee 2 registros desde addr 0 del slave 10) |
 | `DVL+MODBUSCLR=<idx\|ALL>` | Borra una trama específica (`idx`) o todas (`ALL`). | `DVL+MODBUSCLR=1` o `DVL+MODBUSCLR=ALL` |
 
 ## Comandos de ADC (Conversor Analógico-Digital)
