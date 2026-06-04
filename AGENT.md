@@ -1,5 +1,6 @@
 # LILY-GO
 Repositorio para el codigo de el equipo LilyGo
+Siempre pregunta al usuario antes de realizar un commit o push
 Realiza los commits en español para que sea mas facil entender los cambios
 En los commits se indica el tipo de cambio
 Siempre explica el plan de implementacion en español
