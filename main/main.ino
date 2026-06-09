@@ -53,7 +53,7 @@ PubSubClient mqtt(espClient); // lo inicializamos con uno cualquiera
 #define PIN_IN_2 14
 #define PIN_SIREN 15
 
-String versionado = "V02.06.01-AGD_Pivots";
+String versionado = "V02.06.02-AGD_Pivots";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -700,7 +700,7 @@ void loop() {
 
     if (deep_sleep_time > 0 && en_pivot && !isAlarm && !alarmLatched &&
         pivotSentAtLeastOnce && (millis() - lastChangeTime > 3000)) {
-      DVL_PRINTLN("Deep Sleep...");
+      DVL_PRINTLN("Preparando Deep Sleep...");
       esp_sleep_enable_timer_wakeup((uint64_t)deep_sleep_time * 1000000ULL);
       uint64_t wakeMask = 0;
       if (stableIn1 == LOW)
@@ -709,8 +709,32 @@ void loop() {
         wakeMask |= (1ULL << PIN_IN_2);
       if (wakeMask != 0)
         esp_sleep_enable_ext1_wakeup(wakeMask, ESP_EXT1_WAKEUP_ANY_HIGH);
-      if (TINY_GSM_USE_GPRS)
-        modemPowerOff();
+
+      // --- Apagar TODOS los periféricos antes de dormir ---
+
+      // 1. Desconectar MQTT limpiamente
+      if (mqtt.connected()) {
+        mqtt.disconnect();
+        DVL_PRINTLN("[DeepSleep] MQTT desconectado.");
+      }
+
+      // 2. Apagar WiFi
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      DVL_PRINTLN("[DeepSleep] WiFi apagado.");
+
+      // 3. Apagar módem (sin importar el canal de datos activo)
+      modemPowerOff();
+      DVL_PRINTLN("[DeepSleep] Modem apagado.");
+
+      // 4. Apagar LED
+      digitalWrite(LED_PIN, LOW);
+
+      // 5. Asegurar sirena apagada (por seguridad redundante)
+      digitalWrite(PIN_SIREN, LOW);
+
+      DVL_PRINTLN("[DeepSleep] Entrando en Deep Sleep...");
+      delay(100); // Pausa para que se impriman los logs por Serial
       esp_deep_sleep_start();
     }
   }
