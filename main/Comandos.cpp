@@ -193,12 +193,20 @@ String procesarComando(String comando) {
     String v = comando.substring(String("DVL+EN_SERIAL=").length());
     v.trim();
     en_serial = (v == "1") ? 1 : 0;
-    preferences.begin("enables", false);
-    preferences.putUInt("serial", en_serial);
-    preferences.end();
     if (en_serial == 1) {
-      respuesta = ">> HABILITADO LECTURA SERIAL";
+      pinMode(SENSOR_POWER_PIN, OUTPUT);
+      digitalWrite(SENSOR_POWER_PIN, HIGH);
+      en_modbus = 0;
+      modbus_set_enabled(false);
+      preferences.begin("enables", false);
+      preferences.putUInt("serial", 1);
+      preferences.putUInt("modbus", 0);
+      preferences.end();
+      respuesta = ">> HABILITADO LECTURA SERIAL (MODBUS=0)";
     } else {
+      preferences.begin("enables", false);
+      preferences.putUInt("serial", 0);
+      preferences.end();
       respuesta = ">> DESHABILITADO LECTURA SERIAL";
     }
   } /*comando para habilitar MODBUS (excluyente con EN_SERIAL)*/

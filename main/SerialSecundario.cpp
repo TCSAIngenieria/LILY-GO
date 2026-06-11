@@ -15,9 +15,8 @@ extern String sensorValues[16];
 void leerSensorSerial(Stream &serial) {
 
   // Limpiar buffer cada 2.5 segundos
-  if (millis() - ultimaLimpiezaBuffer > intervaloLimpieza) {
-    buffer = "";  // Vaciar buffer
-    receiving = false;
+  if (!receiving && millis() - ultimaLimpiezaBuffer > intervaloLimpieza) {
+    buffer = "";
     ultimaLimpiezaBuffer = millis();
   }
 

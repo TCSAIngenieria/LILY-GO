@@ -33,7 +33,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V05.01.03";
+String versionado = "V05.01.06";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -283,6 +283,12 @@ void setup() {
     conectar_WiFi();
   }
 
+  // Sincronizar reloj via NTP al arrancar (requiere WiFi conectado)
+  if (WiFi.status() == WL_CONNECTED) {
+    DVL_PRINTLN("[NTP] Sincronizando hora al arrancar...");
+    updateClockFromNTP_wifi();
+  }
+
   lectura_flash();
   cargarConfiguracionParser();
 
@@ -462,6 +468,110 @@ void loop() {
       rssi = String(WiFi.RSSI());
     }
 
+    unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+
+    if (en_sensor == 1) {
+      float valSensor = valorStr.toFloat();
+      if (valSensor >= -20.0 && valSensor <= 50.0) {
+        DVL_PRINT("Sensor habilitado. Enviando dato por MQTT...");
+
+        String topicSensor = topic1 + "/DS18B20";
+        topicSensor.toUpperCase();
+
+        String jsonsensor = create_mqtt_json_sensor(
+            topicSensor, ident, valorStr, printCurrentTime(),
+            leer_tension_bateria(), leer_tension_principal(), numPkt);
+
+        if (mqtt.connected()) {
+          if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
+            DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+          } else {
+            if (publish_mqtt_json(topicSensor, jsonsensor)) {
+              mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
+            }
+          }
+        } else {
+          flash_save_packet(jsonsensor.c_str());
+          DVL_PRINTLN(mqtt.connected());
+          DVL_PRINTLN(WiFi.status());
+        }
+      } else {
+        DVL_PRINT("Lectura de sensor fuera de rango (-20 a +50), descartada: ");
+        DVL_PRINTLN(valorStr);
+      }
+    }
+
+    if (en_serial == 1) {
+      DVL_PRINT("Serial habilitado. Enviando dato por MQTT...");
+
+      String topicSerial = topic1 + "/SERIAL";
+      topicSerial.toUpperCase();
+
+      String jsonserial = create_mqtt_json_serial(
+          topicSerial, ident, sensorValues[0], sensorValues[1], sensorValues[2],
+          sensorValues[3], sensorValues[4], sensorValues[5], sensorValues[6],
+          sensorValues[7], sensorValues[8], sensorValues[9], sensorValues[10],
+          sensorValues[11], sensorValues[12], sensorValues[13],
+          sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat,
+          ultimaLon, leer_tension_bateria(), leer_tension_principal(), numPkt);
+
+      if (mqtt.connected()) {
+        if (topicSerial.length() == 0 || jsonserial.length() == 0) {
+          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+        } else {
+          if (publish_mqtt_json(topicSerial, jsonserial)) {
+            mqttUltimaConexionOK = millis(); //  Reset al publicar con exito
+          }
+        }
+      } else {
+        flash_save_packet(jsonserial.c_str());
+        DVL_PRINTLN(mqtt.connected());
+        DVL_PRINTLN(WiFi.status());
+      }
+    }
+
+    if (en_modbus == 1) {
+      DVL_PRINT("Modbus habilitado. Enviando dato por MQTT...");
+
+      String topicModbus = topic1 + "/MODBUS";
+      topicModbus.toUpperCase();
+      String jsonmodbus = create_mqtt_json_modbus(
+          topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
+          leer_tension_bateria(), leer_tension_principal(), numPkt);
+
+      if (mqtt.connected()) {
+        if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
+          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+        } else {
+          if (publish_mqtt_json(topicModbus, jsonmodbus)) {
+            mqttUltimaConexionOK = millis();
+          }
+        }
+      } else {
+        flash_save_packet(jsonmodbus.c_str());
+      }
+    }
+
+    if (en_adc == 1) {
+      DVL_PRINT("ADC habilitado. Enviando reporte ADC...");
+      String topicADC = topic1 + "/ADC";
+      topicADC.toUpperCase();
+      String jsonadc = create_mqtt_json_adc(
+          topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
+
+      if (mqtt.connected()) {
+        if (topicADC.length() == 0 || jsonadc.length() == 0) {
+          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+        } else {
+          if (publish_mqtt_json(topicADC, jsonadc)) {
+            mqttUltimaConexionOK = millis();
+          }
+        }
+      } else {
+        flash_save_packet(jsonadc.c_str());
+      }
+    }
+
     String jsonKeepAlive = create_mqtt_json_keepalive(
         topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
         rebootCount, cType, cDetail, "", "", "", "",
@@ -490,6 +600,20 @@ void loop() {
   // Solo ciclo Modbus si está habilitado
   if (en_modbus && modbus_get_enabled()) {
     modbus_loop();
+  }
+
+  // ---- RE-SINCRONIZACION NTP PERIODICA (cada 8 horas) ----
+  {
+    static unsigned long ultimaActualizacionNTP = 0;
+    const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
+    if (WiFi.status() == WL_CONNECTED &&
+        (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > intervaloNTP))) {
+      if (ultimaActualizacionNTP != 0) { // No re-sincronizar si recien arranco (ya se hizo en setup)
+        DVL_PRINTLN("[NTP] Re-sincronizacion periodica...");
+        updateClockFromNTP_wifi();
+      }
+      ultimaActualizacionNTP = now;
+    }
   }
 
   actualizarLED();

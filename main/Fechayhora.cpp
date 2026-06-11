@@ -54,3 +54,9 @@ String printCurrentTime() {
   strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
   return String(buffer);
 }
+
+bool isTimeSet() {
+  time_t now;
+  time(&now);
+  return (now > 10000);  // true si la hora es valida (posterior a 1970)
+}
