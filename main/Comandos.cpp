@@ -31,6 +31,7 @@ uint en_ble;
 uint en_adc;
 uint en_modem;
 uint en_gps;
+uint en_wifi = 1;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
@@ -192,7 +193,8 @@ String procesarComando(String comando) {
   } else if (comando.startsWith("DVL+EN_SERIAL=")) {
     String v = comando.substring(String("DVL+EN_SERIAL=").length());
     v.trim();
-    en_serial = (v == "1") ? 1 : 0;
+    int val = v.toInt();
+    en_serial = (val == 1 || val == 2) ? val : 0;
     if (en_serial == 1) {
       pinMode(SENSOR_POWER_PIN, OUTPUT);
       digitalWrite(SENSOR_POWER_PIN, HIGH);
@@ -203,6 +205,16 @@ String procesarComando(String comando) {
       preferences.putUInt("modbus", 0);
       preferences.end();
       respuesta = ">> HABILITADO LECTURA SERIAL (MODBUS=0)";
+    } else if (en_serial == 2) {
+      pinMode(SENSOR_POWER_PIN, OUTPUT);
+      digitalWrite(SENSOR_POWER_PIN, HIGH);
+      en_modbus = 0;
+      modbus_set_enabled(false);
+      preferences.begin("enables", false);
+      preferences.putUInt("serial", 2);
+      preferences.putUInt("modbus", 0);
+      preferences.end();
+      respuesta = ">> HABILITADO MODO SERIAL BRIDGE (JSONs por UART2 cuando WiFi caido) (MODBUS=0)";
     } else {
       preferences.begin("enables", false);
       preferences.putUInt("serial", 0);
@@ -239,12 +251,16 @@ String procesarComando(String comando) {
     preferences.putUInt("ble", en_ble);
     if (en_ble == 1) {
       en_sensor = 0;
-      en_serial = 0;
       en_modbus = 0;
+      if (en_serial != 2) en_serial = 0;  // preserva modo bridge
       preferences.putUInt("sensor", 0);
-      preferences.putUInt("serial", 0);
+      preferences.putUInt("serial", en_serial);
       preferences.putUInt("modbus", 0);
-      respuesta = ">> HABILITADO BLE";
+      if (en_serial == 2) {
+        respuesta = ">> HABILITADO BLE (SERIAL BRIDGE MANTENIDO)";
+      } else {
+        respuesta = ">> HABILITADO BLE";
+      }
     } else {
       respuesta = ">> DESHABILITADO BLE";
     }
@@ -275,6 +291,22 @@ String procesarComando(String comando) {
   /*comando para habilitar o deshabilitar GPS*/
   else if (comando.startsWith("DVL+EN_GPS=")) {
     respuesta = ">> ERROR: EL EQUIPO NO DISPONE DE GPS";
+  }
+
+  /*comando para habilitar o deshabilitar WiFi*/
+  else if (comando.startsWith("DVL+EN_WIFI=")) {
+    String v = comando.substring(String("DVL+EN_WIFI=").length());
+    v.trim();
+    en_wifi = (v == "1") ? 1 : 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("wifi", en_wifi);
+    preferences.end();
+    if (en_wifi == 1) {
+      respuesta = ">> HABILITADO WIFI";
+    } else {
+      respuesta = ">> DESHABILITADO WIFI (MODO BRIDGE)";
+    }
   }
 
   /* comando para configurar tramas:

@@ -33,7 +33,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V05.01.06";
+String versionado = "V05.02.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -59,6 +59,7 @@ extern uint en_ble;
 extern uint en_adc;
 extern uint en_modem;
 extern uint en_gps;
+extern uint en_wifi;
 // WIFI
 extern bool wifiConfigurado;
 unsigned long configure_wifi_time = 0;
@@ -155,6 +156,7 @@ void setup() {
   en_modbus = preferences.getUInt("modbus", 0);
   en_ble = preferences.getUInt("ble", 0);
   en_adc = preferences.getUInt("adc", 0);
+  en_wifi = preferences.getUInt("wifi", 1);
   preferences.end();
 
   // --- Contador de reinicios y Lectura de AP Mode ---
@@ -279,12 +281,12 @@ void setup() {
 
   // La carga del WiFi se movio al principio del setup para verificar el modo AP
 
-  if (ssid.length() > 0) {
+  if (en_wifi && ssid.length() > 0) {
     conectar_WiFi();
   }
 
   // Sincronizar reloj via NTP al arrancar (requiere WiFi conectado)
-  if (WiFi.status() == WL_CONNECTED) {
+  if (en_wifi && WiFi.status() == WL_CONNECTED) {
     DVL_PRINTLN("[NTP] Sincronizando hora al arrancar...");
     updateClockFromNTP_wifi();
   }
@@ -344,7 +346,7 @@ void loop() {
   // buttonTaskTracker)
 
 // ========== FASE GPRS/WIFI ==========
-  if (WiFi.status() != WL_CONNECTED) {
+  if (en_wifi && WiFi.status() != WL_CONNECTED) {
     conectar_WiFi();
   }
 
@@ -364,7 +366,7 @@ void loop() {
     bleScanner.loop();
 
     if (bleScanner.hasNewData()) {
-      DVL_PRINTLN("Detectados nuevos datos BLE, preparando envio MQTT...");
+      DVL_PRINTLN("Detectados nuevos datos BLE, preparando envio...");
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
@@ -399,7 +401,10 @@ void loop() {
             topicBLE, ident, printCurrentTime(), bleData, ultimaLat, ultimaLon,
             leer_tension_bateria(), leer_tension_principal(), numPkt);
 
-        if (mqtt.connected()) {
+        if (en_serial == 2 && WiFi.status() != WL_CONNECTED) {
+          DVL_PRINTLN("[BRIDGE] Enviando BLE por UART2");
+          SensorSerial.println(jsonBLE);
+        } else if (mqtt.connected()) {
           if (publish_mqtt_json(topicBLE, jsonBLE)) {
             mqttUltimaConexionOK = millis();
           } else {
@@ -462,6 +467,8 @@ void loop() {
 
     lastPublish = now;
 
+    bool usarSerialBridge = (en_serial == 2 && WiFi.status() != WL_CONNECTED);
+
     if (WiFi.status() == WL_CONNECTED) {
       cType = "WIFI";
       cDetail = WiFi.SSID();
@@ -482,7 +489,10 @@ void loop() {
             topicSensor, ident, valorStr, printCurrentTime(),
             leer_tension_bateria(), leer_tension_principal(), numPkt);
 
-        if (mqtt.connected()) {
+        if (usarSerialBridge) {
+          DVL_PRINTLN("[BRIDGE] Enviando sensor por UART2");
+          SensorSerial.println(jsonsensor);
+        } else if (mqtt.connected()) {
           if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
             DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
           } else {
@@ -501,7 +511,7 @@ void loop() {
       }
     }
 
-    if (en_serial == 1) {
+    if (en_serial == 1 && !usarSerialBridge) {
       DVL_PRINT("Serial habilitado. Enviando dato por MQTT...");
 
       String topicSerial = topic1 + "/SERIAL";
@@ -539,7 +549,10 @@ void loop() {
           topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
           leer_tension_bateria(), leer_tension_principal(), numPkt);
 
-      if (mqtt.connected()) {
+      if (usarSerialBridge) {
+        DVL_PRINTLN("[BRIDGE] Enviando Modbus por UART2");
+        SensorSerial.println(jsonmodbus);
+      } else if (mqtt.connected()) {
         if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
           DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
@@ -559,7 +572,10 @@ void loop() {
       String jsonadc = create_mqtt_json_adc(
           topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
 
-      if (mqtt.connected()) {
+      if (usarSerialBridge) {
+        DVL_PRINTLN("[BRIDGE] Enviando ADC por UART2");
+        SensorSerial.println(jsonadc);
+      } else if (mqtt.connected()) {
         if (topicADC.length() == 0 || jsonadc.length() == 0) {
           DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
@@ -576,7 +592,10 @@ void loop() {
         topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
         rebootCount, cType, cDetail, "", "", "", "",
         "", rssi);
-    if (mqtt.connected()) {
+    if (usarSerialBridge) {
+      DVL_PRINTLN("[BRIDGE] Enviando KeepAlive por UART2");
+      SensorSerial.println(jsonKeepAlive);
+    } else if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }
     lastNoDataMessage = now;
@@ -592,8 +611,8 @@ void loop() {
 
   escucharComandos();
 
-  // Solo leo SerialSecundario si está habilitado EN_SERIAL
-  if (en_serial) {
+  // Solo leo SerialSecundario en modo 1 (lectura de expansora)
+  if (en_serial == 1) {
     leerSensorSerial(SensorSerial);
   }
 
@@ -606,7 +625,7 @@ void loop() {
   {
     static unsigned long ultimaActualizacionNTP = 0;
     const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
-    if (WiFi.status() == WL_CONNECTED &&
+    if (en_wifi && WiFi.status() == WL_CONNECTED &&
         (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > intervaloNTP))) {
       if (ultimaActualizacionNTP != 0) { // No re-sincronizar si recien arranco (ya se hizo en setup)
         DVL_PRINTLN("[NTP] Re-sincronizacion periodica...");
