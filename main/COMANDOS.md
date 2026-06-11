@@ -9,7 +9,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
-| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http://midominio.com/firmware.bin` |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA= http://midominio.com/firmware.bin` |
 | `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN=igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
@@ -56,6 +56,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+SFINI=<txt>` | Establece el marcador de inicio de trama. | `DVL+SFINI=DATA,` |
 | `DVL+SFFIN=<txt>` | Establece el marcador de fin de trama. | `DVL+SFFIN=\r` |
 | `DVL+SPARSE=<char>` | Establece el caracter separador de datos. | `DVL+SPARSE=,` |
+| `DVL+SBAUD=<baud>` | Establece la velocidad del puerto serial secundario (UART2). Valores soportados: 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200. Se aplica inmediatamente. | `DVL+SBAUD=9600` |
 | `DVL+STIME=<seg>` | Establece el intervalo de publicación de datos en segundos. | `DVL+STIME=60` |
 | `EXP+<cmd>` | Envía el comando `<cmd>` directamente a la expansora por serial secundario. | `EXP+LEER` |
 
@@ -77,6 +78,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QFINI` | Muestra el marcador de inicio actual. | `START_MARKER=DATA,` |
 | `DVL+QFFIN` | Muestra el marcador de fin actual. | `END_MARKER=\r` |
 | `DVL+QPARSE` | Muestra el separador configurado. | `SEPARATOR=,` |
+| `DVL+QBAUD` | Muestra la velocidad del puerto serial secundario. | `BAUD=4800` |
 | `DVL+QAPN` | Muestra el APN configurado para la conexión GPRS. | `APN=igprs.claro.com.ar` |
 | `DVL+QEN_ADC` | Consulta si el reporte independiente del ADC está habilitado. | `EN_ADC=1` |
 | `DVL+QEN_MODEM` | Consulta si el módem celular está habilitado. | `EN_MODEM=1` |
@@ -108,6 +110,6 @@ DVL+EN_BLE=1             → Habilita escaneo BLE (se preserva el bridge)
 ### Salida esperada por UART2 (JSON)
 
 ```json
-{"topic":"DVL/NODEMCU/OBU_123/DS18B20","ident":"OBU_123","temperatura":"25.3","date":"...","Tension_bateria":4.12,"Tension_principal":5.0,"Version":"V05.02.03","index":1}
-{"topic":"DVL/NODEMCU/OBU_123","ident":"OBU_123","status":"keep-alive","date":"...","Version":"V05.02.03","reboot_count":1,"conn_type":"","RSSI":""}
+{"topic":"DVL/NODEMCU/OBU_123/DS18B20","ident":"OBU_123","temperatura":"25.3","date":"...", "Tension_bateria":4.12,"Tension_principal":5.0,"Version":"V05.02.03","index":1}
+{"topic":"DVL/NODEMCU/OBU_123","ident":"OBU_123","status":"keep-alive","date":"...", "Version":"V05.02.03","reboot_count":1,"conn_type":"","RSSI":""}
 ```

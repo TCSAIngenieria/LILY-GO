@@ -33,7 +33,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V05.02.03";
+String versionado = "V05.03.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -68,6 +68,7 @@ Preferences preferences;
 
 // Valores puerto serial secundario;
 extern String sensorValues[16];
+extern uint32_t serialBaud;
 
 
 
@@ -143,7 +144,12 @@ void buttonTaskTracker(void *pvParameters) {
 
 void setup() {
   SerialMon.begin(115200); // puerto serial primario
-  SensorSerial.begin(4800, SERIAL_8N1, 32,
+
+  preferences.begin("serial_cfg", true);
+  serialBaud = preferences.getULong("baud", 4800);
+  preferences.end();
+
+  SensorSerial.begin(serialBaud, SERIAL_8N1, 32,
                      33); // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
 
   // Inicializar Modbus sobre el puerto secundario

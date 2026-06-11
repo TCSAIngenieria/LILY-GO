@@ -35,6 +35,7 @@ uint en_wifi = 1;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
+uint32_t serialBaud = 4800;
 
 String procesarComando(String comando) {
   comando.trim();
@@ -414,6 +415,23 @@ String procesarComando(String comando) {
     } else {
       respuesta = "ERROR: Valor fuera de rango (1-65000)";
     }
+
+  } else if (comando.startsWith("DVL+SBAUD=")) {
+    unsigned long val = strtoul(comando.substring(10).c_str(), NULL, 10);
+    if (val == 1200 || val == 2400 || val == 4800 || val == 9600 ||
+        val == 19200 || val == 38400 || val == 57600 || val == 115200) {
+      serialBaud = val;
+      preferences.begin("serial_cfg", false);
+      preferences.putULong("baud", serialBaud);
+      preferences.end();
+      SensorSerial.begin(serialBaud, SERIAL_8N1, 32, 33);
+      respuesta = ">> BAUD RATE SETEADO A " + String(serialBaud);
+    } else {
+      respuesta = "ERROR: Baud rate no soportado (1200,2400,4800,9600,19200,38400,57600,115200)";
+    }
+
+  } else if (comando == "DVL+QBAUD") {
+    respuesta = "BAUD=" + String(serialBaud);
 
   } else if (comando == "DVL+QTADC") {
     respuesta = "TIME ADC=" + String(tADC);
