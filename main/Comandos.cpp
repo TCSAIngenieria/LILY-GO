@@ -485,6 +485,12 @@ String procesarComando(String comando) {
     preferences.end();
     respuesta = "EN_ADC=" + String(en_adc);
 
+  } else if (comando == "DVL+QEN_WIFI") {
+    preferences.begin("enables", true);
+    en_wifi = preferences.getUInt("wifi", 1);
+    preferences.end();
+    respuesta = "EN_WIFI=" + String(en_wifi);
+
   } else if (comando == "DVL+QEN_MODEM") {
     preferences.begin("enables", true);
     en_modem = preferences.getUInt("modem", 1);

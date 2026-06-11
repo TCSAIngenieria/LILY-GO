@@ -17,9 +17,10 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
 | `DVL+EN_SENSOR=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del sensor conectado (ej. DS18B20). | `DVL+EN_SENSOR=1` |
-| `DVL+EN_SERIAL=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del puerto serial secundario. | `DVL+EN_SERIAL=1` |
+| `DVL+EN_SERIAL=<0\|1\|2>` | 0=deshabilitado, 1=lectura expansora, 2=modo bridge (envía JSONs por UART2 cuando WiFi caído). Al habilitar 1 o 2, deshabilita Modbus. | `DVL+EN_SERIAL=2` |
+| `DVL+EN_WIFI=<1\|0>` | Habilita (1) o deshabilita (0) la conexión WiFi. Al deshabilitar, el dispositivo no intenta conectarse y usa el bridge serial si está configurado. | `DVL+EN_WIFI=0` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (1) o deshabilita (0) el módulo Modbus. Al habilitar Modbus, se deshabilita Serial. | `DVL+EN_MODBUS=1` |
-| `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Al habilitar, deshabilita otros sensores. | `DVL+EN_BLE=1` |
+| `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Si el bridge serial (en_serial=2) está activo, se preserva. | `DVL+EN_BLE=1` |
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
 | `DVL+EN_MODEM=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módem celular (GPRS). | `DVL+EN_MODEM=1` |
 | `DVL+EN_GPS=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módulo de GPS/GNSS. | `DVL+EN_GPS=1` |
@@ -63,7 +64,8 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | Comando | Descripción | Retorno Ejemplo |
 |:---|:---|:---|
 | `DVL+QEN_SENSOR` | Consulta si el sensor está habilitado. | `EN_SENSOR=1` |
-| `DVL+QEN_SERIAL` | Consulta si el serial está habilitado. | `EN_SERIAL=0` |
+| `DVL+QEN_SERIAL` | Consulta el modo serial. | `EN_SERIAL=2` |
+| `DVL+QEN_WIFI` | Consulta si WiFi está habilitado. | `EN_WIFI=1` |
 | `DVL+QEN_MODBUS` | Consulta si Modbus está habilitado. | `EN_MODBUS=1` |
 | `DVL+QEN_BLE` | Consulta si BLE está habilitado. | `EN_BLE=0` |
 | `DVL+QMODBUS` | Muestra las tramas Modbus configuradas (salida por Serial). | `[OK] Ver detalle por Serial` |
@@ -81,3 +83,31 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QEN_GPS` | Consulta si el módulo de GPS está habilitado. | `EN_GPS=1` |
 | `DVL+QLAT` | Muestra la última latitud registrada. | `LAT=-34.60` |
 | `DVL+QLONG` | Muestra la última longitud registrada. | `LONG=-58.38` |
+| `DVL+QEN_WIFI` | Consulta si WiFi está habilitado. | `EN_WIFI=1` |
+
+---
+
+## Modo Serial Bridge (EN_SERIAL=2)
+
+Cuando se configura `DVL+EN_SERIAL=2`, el dispositivo entra en **modo bridge serial**. En este modo:
+
+- **No lee** datos de la expansora (solo modo 1 lo hace).
+- Cuando **WiFi está caído** (o deshabilitado con `DVL+EN_WIFI=0`), todos los JSONs de telemetría (sensor, Modbus, ADC, BLE, KeepAlive) se envían por el **puerto serial secundario (UART2, GPIO33)** a 4800 baud.
+- Cuando WiFi está disponible, los JSONs se envían por MQTT normalmente.
+
+Esto permite conectar un gateway BLE al UART2 que reciba los JSONs y los retransmita por BLE a un concentrador.
+
+### Ejemplo de uso típico
+
+```
+DVL+EN_SERIAL=2          → Habilita bridge serial
+DVL+EN_WIFI=0            → Deshabilita WiFi (opcional, evita reintentos)
+DVL+EN_BLE=1             → Habilita escaneo BLE (se preserva el bridge)
+```
+
+### Salida esperada por UART2 (JSON)
+
+```json
+{"topic":"DVL/NODEMCU/OBU_123/DS18B20","ident":"OBU_123","temperatura":"25.3","date":"...","Tension_bateria":4.12,"Tension_principal":5.0,"Version":"V05.02.03","index":1}
+{"topic":"DVL/NODEMCU/OBU_123","ident":"OBU_123","status":"keep-alive","date":"...","Version":"V05.02.03","reboot_count":1,"conn_type":"","RSSI":""}
+```
