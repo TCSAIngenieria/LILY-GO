@@ -112,28 +112,29 @@ void leerYRetransmitirSerial(Stream &serial) {
     char c = serial.read();
     lastRecvTime = millis();
 
+    // Si el buffer está vacío, ignoramos cualquier carácter hasta encontrar el inicio de un JSON '{'
+    if (jsonBuffer.length() == 0 && c != '{') {
+      continue;
+    }
+
     if (c == '\n') {
       jsonBuffer.trim();
       if (jsonBuffer.length() > 0) {
-        DVL_PRINTLN("[SERIAL] JSON completo recibido. Retransmitiendo...");
-        
-        // Parsear para extraer el tópico si es un JSON
+        // Parsear para extraer el tópico y validar el JSON
         StaticJsonDocument<2048> doc;
-        String sendTopic = "";
         DeserializationError error = deserializeJson(doc, jsonBuffer);
         if (!error && doc.containsKey("topic")) {
-          sendTopic = doc["topic"].as<String>();
+          String sendTopic = doc["topic"].as<String>();
+          
+          if (mqtt.connected()) {
+            publish_mqtt_json(sendTopic, jsonBuffer);
+          } else {
+            flash_save_packet(jsonBuffer.c_str());
+            DVL_PRINTLN("[SERIAL] MQTT desconectado. Datos guardados en flash.");
+          }
         } else {
-          // Si no tiene topic o no es JSON válido, usamos un tópico por defecto
-          sendTopic = "DVL/LILY-GO/" + ident + "/RETRANSMITIDO";
-          sendTopic.toUpperCase();
-        }
-
-        if (mqtt.connected()) {
-          publish_mqtt_json(sendTopic, jsonBuffer);
-        } else {
-          flash_save_packet(jsonBuffer.c_str());
-          DVL_PRINTLN("[SERIAL] MQTT desconectado. Datos guardados en flash.");
+          DVL_PRINT("[SERIAL] JSON inválido o sin tópico. Descartado: ");
+          DVL_PRINTLN(jsonBuffer);
         }
       }
       jsonBuffer = "";

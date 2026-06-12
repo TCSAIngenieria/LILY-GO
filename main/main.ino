@@ -203,6 +203,7 @@ void setup() {
   serialBaud = preferences.getULong("baud", 4800);
   preferences.end();
 
+  SensorSerial.setRxBufferSize(2048);
   SensorSerial.begin(serialBaud, SERIAL_8N1, 32,
                      33); // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
 

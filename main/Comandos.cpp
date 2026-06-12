@@ -152,6 +152,8 @@ String procesarComando(String comando) {
       preferences.begin("serial_cfg", false);
       preferences.putULong("baud", serialBaud);
       preferences.end();
+      SensorSerial.end();
+      SensorSerial.setRxBufferSize(2048);
       SensorSerial.begin(serialBaud, SERIAL_8N1, 32, 33);
       respuesta = ">> BAUD RATE SETEADO A " + String(serialBaud);
     } else {
