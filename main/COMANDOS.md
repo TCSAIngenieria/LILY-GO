@@ -9,15 +9,15 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
-| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http://midominio.com/firmware.bin` |
-| `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN=igprs.claro.com.ar` |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http:// midominio.com/ firmware.bin` |
+| `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN= igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
 
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
 | `DVL+EN_SENSOR=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del sensor conectado (ej. DS18B20). | `DVL+EN_SENSOR=1` |
-| `DVL+EN_SERIAL=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del puerto serial secundario. | `DVL+EN_SERIAL=1` |
+| `DVL+EN_SERIAL=<1\|0\|2>` | Configura el puerto serial secundario. 1: Lectura normal de trama. 2: Retransmisión transparente de JSONs de NodeMCU al Broker. 0: Deshabilitado. | `DVL+EN_SERIAL=2` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (1) o deshabilita (0) el módulo Modbus. Al habilitar Modbus, se deshabilita Serial. | `DVL+EN_MODBUS=1` |
 | `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Al habilitar, deshabilita otros sensores. | `DVL+EN_BLE=1` |
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
@@ -29,7 +29,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
-| `DVL+MODBUS=<idx>,<ID>,<FUNC>,<ADDR>,<QTY>` | Configura una trama Modbus en el índice `idx` (1-5). | `DVL+MODBUS=1,10,3,0,2`<br>(Lee 2 registros desde addr 0 del slave 10) |
+| `DVL+MODBUS=<idx>,<ID>, <FUNC>,<ADDR>,<QTY>` | Configura una trama Modbus en el índice `idx` (1-5). | `DVL+MODBUS=1,10,3,0,2`<br>(Lee 2 registros desde addr 0 del slave 10) |
 | `DVL+MODBUSCLR=<idx\|ALL>` | Borra una trama específica (`idx`) o todas (`ALL`). | `DVL+MODBUSCLR=1` o `DVL+MODBUSCLR=ALL` |
 
 ## Comandos de ADC (Conversor Analógico-Digital)
@@ -55,6 +55,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+SFINI=<txt>` | Establece el marcador de inicio de trama. | `DVL+SFINI=DATA,` |
 | `DVL+SFFIN=<txt>` | Establece el marcador de fin de trama. | `DVL+SFFIN=\r` |
 | `DVL+SPARSE=<char>` | Establece el caracter separador de datos. | `DVL+SPARSE=,` |
+| `DVL+SBAUD=<baud>` | Establece la velocidad del puerto serial secundario (UART2). Valores soportados: 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200. Se aplica inmediatamente. | `DVL+SBAUD=9600` |
 | `DVL+STIME=<seg>` | Establece el intervalo de publicación de datos en segundos. | `DVL+STIME=60` |
 | `EXP+<cmd>` | Envía el comando `<cmd>` directamente a la expansora por serial secundario. | `EXP+LEER` |
 
@@ -75,6 +76,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QFINI` | Muestra el marcador de inicio actual. | `START_MARKER=DATA,` |
 | `DVL+QFFIN` | Muestra el marcador de fin actual. | `END_MARKER=\r` |
 | `DVL+QPARSE` | Muestra el separador configurado. | `SEPARATOR=,` |
+| `DVL+QBAUD` | Muestra la velocidad del puerto serial secundario. | `BAUD=4800` |
 | `DVL+QAPN` | Muestra el APN configurado para la conexión GPRS. | `APN=igprs.claro.com.ar` |
 | `DVL+QEN_ADC` | Consulta si el reporte independiente del ADC está habilitado. | `EN_ADC=1` |
 | `DVL+QEN_MODEM` | Consulta si el módem celular está habilitado. | `EN_MODEM=1` |

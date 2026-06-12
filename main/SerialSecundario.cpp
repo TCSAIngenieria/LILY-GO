@@ -1,6 +1,11 @@
 #include "comandos.h"  // Para acceder a getStartMarker(), getEndMarker(), getSeparator(), etc.
 #include "Debug.h"
 #include <Arduino.h>
+#include "MQTT.h"
+#include "Flash.h"
+#include <ArduinoJson.h>
+
+extern String ident;
 
 String buffer = "";
 bool receiving = false;
@@ -89,6 +94,58 @@ void imprimirSensorValuesValidos() {
       DVL_PRINT(i);
       DVL_PRINT(": ");
       DVL_PRINTLN(sensorValues[i]);
+    }
+  }
+}
+
+void leerYRetransmitirSerial(Stream &serial) {
+  static String jsonBuffer = "";
+  static unsigned long lastRecvTime = 0;
+
+  if (jsonBuffer.length() > 0 && millis() - lastRecvTime > 5000) {
+    DVL_PRINT("[SERIAL] Timeout de buffer de retransmisión. Descartado: ");
+    DVL_PRINTLN(jsonBuffer);
+    jsonBuffer = "";
+  }
+
+  while (serial.available()) {
+    char c = serial.read();
+    lastRecvTime = millis();
+
+    // Si el buffer está vacío, ignoramos cualquier carácter hasta encontrar el inicio de un JSON '{'
+    if (jsonBuffer.length() == 0 && c != '{') {
+      continue;
+    }
+
+    if (c == '\n') {
+      jsonBuffer.trim();
+      if (jsonBuffer.length() > 0) {
+        // Parsear para extraer el tópico y validar el JSON
+        StaticJsonDocument<2048> doc;
+        DeserializationError error = deserializeJson(doc, jsonBuffer);
+        if (!error && doc.containsKey("topic")) {
+          String sendTopic = doc["topic"].as<String>();
+          
+          if (mqtt.connected()) {
+            publish_mqtt_json(sendTopic, jsonBuffer);
+          } else {
+            flash_save_packet(jsonBuffer.c_str());
+            DVL_PRINTLN("[SERIAL] MQTT desconectado. Datos guardados en flash.");
+          }
+        } else {
+          DVL_PRINT("[SERIAL] JSON inválido o sin tópico. Descartado: ");
+          DVL_PRINTLN(jsonBuffer);
+        }
+      }
+      jsonBuffer = "";
+    } else if (c != '\r') {
+      // Evitamos desbordamiento de memoria por ruido en la línea serial
+      if (jsonBuffer.length() < 2048) {
+        jsonBuffer += c;
+      } else {
+        DVL_PRINTLN("[SERIAL] ERROR: Buffer de retransmisión excedió los 2048 bytes. Descartando...");
+        jsonBuffer = "";
+      }
     }
   }
 }

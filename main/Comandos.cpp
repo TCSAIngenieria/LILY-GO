@@ -35,6 +35,7 @@ uint en_gps;
 
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
+uint32_t serialBaud = 4800;
 
 String procesarComando(String comando) {
   comando.trim();
@@ -143,6 +144,22 @@ String procesarComando(String comando) {
     publishInterval = strtoul(publishInterval_s.c_str(), NULL, 10);
     respuesta = "TIEMPO SETEADO OK";
 
+  } else if (comando.startsWith("DVL+SBAUD=")) {
+    unsigned long val = strtoul(comando.substring(10).c_str(), NULL, 10);
+    if (val == 1200 || val == 2400 || val == 4800 || val == 9600 ||
+        val == 19200 || val == 38400 || val == 57600 || val == 115200) {
+      serialBaud = val;
+      preferences.begin("serial_cfg", false);
+      preferences.putULong("baud", serialBaud);
+      preferences.end();
+      SensorSerial.end();
+      SensorSerial.setRxBufferSize(2048);
+      SensorSerial.begin(serialBaud, SERIAL_8N1, 32, 33);
+      respuesta = ">> BAUD RATE SETEADO A " + String(serialBaud);
+    } else {
+      respuesta = "ERROR: Baud rate no soportado (1200,2400,4800,9600,19200,38400,57600,115200)";
+    }
+
     /* COMANDO APN */
   } else if (comando.startsWith("DVL+SAPN=")) {
     String nuevoAPN = comando.substring(9);
@@ -197,12 +214,21 @@ String procesarComando(String comando) {
   } else if (comando.startsWith("DVL+EN_SERIAL=")) {
     String v = comando.substring(String("DVL+EN_SERIAL=").length());
     v.trim();
-    en_serial = (v == "1") ? 1 : 0;
+    int val = v.toInt();
+    if (val == 1) {
+      en_serial = 1;
+    } else if (val == 2) {
+      en_serial = 2;
+    } else {
+      en_serial = 0;
+    }
     preferences.begin("enables", false);
     preferences.putUInt("serial", en_serial);
     preferences.end();
     if (en_serial == 1) {
       respuesta = ">> HABILITADO LECTURA SERIAL";
+    } else if (en_serial == 2) {
+      respuesta = ">> HABILITADO SERIAL BRIDGE / RETRANSMISION";
     } else {
       respuesta = ">> DESHABILITADO LECTURA SERIAL";
     }
@@ -459,6 +485,9 @@ String procesarComando(String comando) {
     en_serial = preferences.getUInt("serial", 0);
     preferences.end();
     respuesta = "EN_SERIAL=" + String(en_serial);
+
+  } else if (comando == "DVL+QBAUD") {
+    respuesta = "BAUD=" + String(serialBaud);
 
   } else if (comando == "DVL+QEN_BLE") {
     preferences.begin("enables", true);
