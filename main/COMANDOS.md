@@ -23,6 +23,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
 | `DVL+EN_MODEM=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módem celular (GPRS). | `DVL+EN_MODEM=1` |
 | `DVL+EN_GPS=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módulo de GPS/GNSS. | `DVL+EN_GPS=1` |
+| `DVL+EN_WIFI=<1\|0>` | Habilita (1) o deshabilita (0) el uso de la conexión WiFi. Al deshabilitar, opera sólo con módem. | `DVL+EN_WIFI=1` |
 | `DVL+EXP_RESET` | Reinicia la placa expansora (ciclo de energía). | `DVL+EXP_RESET` |
 
 ## Comandos de Modbus
@@ -81,5 +82,6 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QEN_ADC` | Consulta si el reporte independiente del ADC está habilitado. | `EN_ADC=1` |
 | `DVL+QEN_MODEM` | Consulta si el módem celular está habilitado. | `EN_MODEM=1` |
 | `DVL+QEN_GPS` | Consulta si el módulo de GPS está habilitado. | `EN_GPS=1` |
+| `DVL+QEN_WIFI` | Consulta si el WiFi está habilitado. | `EN_WIFI=1` |
 | `DVL+QLAT` | Muestra la última latitud registrada. | `LAT=-34.60` |
 | `DVL+QLONG` | Muestra la última longitud registrada. | `LONG=-58.38` |

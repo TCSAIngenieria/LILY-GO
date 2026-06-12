@@ -77,6 +77,7 @@ extern uint en_ble;
 extern uint en_adc;
 extern uint en_modem;
 extern uint en_gps;
+uint en_wifi;
 
 // WIFI
 extern bool wifiConfigurado;
@@ -219,6 +220,7 @@ void setup() {
   en_adc = preferences.getUInt("adc", 0);
   en_modem = preferences.getUInt("modem", 1);
   en_gps = preferences.getUInt("gps", 1);
+  en_wifi = preferences.getUInt("wifi", 1);
   preferences.end();
 
   // --- Contador de reinicios y Lectura de AP Mode ---
@@ -350,8 +352,12 @@ void setup() {
 
   // La carga del WiFi se movio al principio del setup para verificar el modo AP
 
-  if (ssid.length() > 0) {
+  if (en_wifi && ssid.length() > 0) {
     conectar_WiFi();
+  } else if (!en_wifi) {
+    wifiConfigurado = false;
+    TINY_GSM_USE_WIFI = false;
+    TINY_GSM_USE_GPRS = true;
   }
 
   lectura_flash();
@@ -512,9 +518,10 @@ void loop() {
   if (faseGPRS_WIFI) {
 
     if (now - unahora >= (60 * 1000 * 60)) { // contador 1 hora
-
-      TINY_GSM_USE_WIFI = true;
-      TINY_GSM_USE_GPRS = false;
+      if (en_wifi) {
+        TINY_GSM_USE_WIFI = true;
+        TINY_GSM_USE_GPRS = false;
+      }
     }
 
     if (TINY_GSM_USE_WIFI == true && TINY_GSM_USE_GPRS == false &&
@@ -991,6 +998,13 @@ unsigned long obtener_y_avanzar_numero_paquete() {
 }
 
 void conectar_WiFi() {
+  if (!en_wifi) {
+    DVL_PRINTLN("WiFi deshabilitado por configuración (EN_WIFI=0).");
+    wifiConfigurado = false;
+    TINY_GSM_USE_WIFI = false;
+    TINY_GSM_USE_GPRS = true;
+    return;
+  }
 
   DVL_PRINTLN("Intentando conectar a WiFi guardada...");
   WiFi.mode(WIFI_STA);

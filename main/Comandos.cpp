@@ -7,6 +7,7 @@
 #include "Modbus.h"
 #include <Preferences.h>
 #include "MQTT.h"
+#include <WiFi.h>
 
 extern Preferences preferences;
 
@@ -36,6 +37,9 @@ uint en_gps;
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
 uint32_t serialBaud = 4800;
+uint en_wifi;
+extern bool TINY_GSM_USE_WIFI;
+extern bool TINY_GSM_USE_GPRS;
 
 String procesarComando(String comando) {
   comando.trim();
@@ -322,6 +326,29 @@ String procesarComando(String comando) {
     }
   }
 
+  /*comando para habilitar o deshabilitar WiFi*/
+  else if (comando.startsWith("DVL+EN_WIFI=")) {
+    String v = comando.substring(String("DVL+EN_WIFI=").length());
+    v.trim();
+    en_wifi = (v == "1") ? 1 : 0;
+
+    preferences.begin("enables", false);
+    preferences.putUInt("wifi", en_wifi);
+    preferences.end();
+    if (en_wifi == 1) {
+      WiFi.mode(WIFI_STA);
+      TINY_GSM_USE_WIFI = true;
+      TINY_GSM_USE_GPRS = false;
+      respuesta = ">> HABILITADO WIFI (INTENTANDO CONEXION)";
+    } else {
+      TINY_GSM_USE_WIFI = false;
+      TINY_GSM_USE_GPRS = true;
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      respuesta = ">> DESHABILITADO WIFI (USANDO EXCLUSIVAMENTE MODEM)";
+    }
+  }
+
   /* comando para configurar tramas:
      DVL+MODBUS=idx,ID,FUNC,LONG
      idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
@@ -512,6 +539,12 @@ String procesarComando(String comando) {
     en_gps = preferences.getUInt("gps", 1);
     preferences.end();
     respuesta = "EN_GPS=" + String(en_gps);
+
+  } else if (comando == "DVL+QEN_WIFI") {
+    preferences.begin("enables", true);
+    en_wifi = preferences.getUInt("wifi", 1);
+    preferences.end();
+    respuesta = "EN_WIFI=" + String(en_wifi);
 
   } else if (comando.startsWith("EXP+")) {
     // Reenvia el comando al puerto serial secundario
