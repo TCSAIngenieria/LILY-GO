@@ -77,7 +77,7 @@ extern uint en_ble;
 extern uint en_adc;
 extern uint en_modem;
 extern uint en_gps;
-uint en_wifi;
+extern uint en_wifi;
 
 // WIFI
 extern bool wifiConfigurado;
