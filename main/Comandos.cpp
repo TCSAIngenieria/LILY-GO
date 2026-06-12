@@ -6,6 +6,7 @@
 #include "Modbus.h"
 #include <Preferences.h>
 #include "MQTT.h"
+#include <WiFi.h>
 
 extern Preferences preferences;
 
@@ -298,13 +299,25 @@ String procesarComando(String comando) {
   else if (comando.startsWith("DVL+EN_WIFI=")) {
     String v = comando.substring(String("DVL+EN_WIFI=").length());
     v.trim();
-    en_wifi = (v == "1") ? 1 : 0;
+    int val = v.toInt();
+    if (val == 1) {
+      en_wifi = 1;
+    } else if (val == 2) {
+      en_wifi = 2;
+    } else {
+      en_wifi = 0;
+    }
 
     preferences.begin("enables", false);
     preferences.putUInt("wifi", en_wifi);
     preferences.end();
+
+    WiFi.disconnect(true);
+
     if (en_wifi == 1) {
-      respuesta = ">> HABILITADO WIFI";
+      respuesta = ">> HABILITADO WIFI CLIENTE";
+    } else if (en_wifi == 2) {
+      respuesta = ">> HABILITADO WIFI AP BRIDGE CLIENT";
     } else {
       respuesta = ">> DESHABILITADO WIFI (MODO BRIDGE)";
     }

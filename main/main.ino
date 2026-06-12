@@ -8,6 +8,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
 
 #include "ADC.h"
 #include "BLE_MOKO.h"
@@ -33,7 +34,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V05.03.01";
+String versionado = "V06.01.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -287,12 +288,12 @@ void setup() {
 
   // La carga del WiFi se movio al principio del setup para verificar el modo AP
 
-  if (en_wifi && ssid.length() > 0) {
+  if ((en_wifi == 1 && ssid.length() > 0) || en_wifi == 2) {
     conectar_WiFi();
   }
 
   // Sincronizar reloj via NTP al arrancar (requiere WiFi conectado)
-  if (en_wifi && WiFi.status() == WL_CONNECTED) {
+  if (en_wifi == 1 && WiFi.status() == WL_CONNECTED) {
     DVL_PRINTLN("[NTP] Sincronizando hora al arrancar...");
     updateClockFromNTP_wifi();
   }
@@ -358,7 +359,7 @@ void loop() {
 
   bool hasNetwork = (WiFi.status() == WL_CONNECTED);
 
-  if (hasNetwork && !mqtt.connected()) {
+  if (en_wifi == 1 && hasNetwork && !mqtt.connected()) {
     uint32_t t = millis();
     if (t - lastReconnectAttempt > 10000) {
       lastReconnectAttempt = t;
@@ -410,6 +411,11 @@ void loop() {
         if (en_serial == 2 && WiFi.status() != WL_CONNECTED) {
           DVL_PRINTLN("[BRIDGE] Enviando BLE por UART2");
           SensorSerial.println(jsonBLE);
+        } else if (en_wifi == 2) {
+          if (!enviarPorHTTPBridge(topicBLE, jsonBLE)) {
+            flash_save_packet(jsonBLE.c_str());
+            DVL_PRINTLN("[BRIDGE CLIENT] HTTP falló. Datos BLE guardados en flash.");
+          }
         } else if (mqtt.connected()) {
           if (publish_mqtt_json(topicBLE, jsonBLE)) {
             mqttUltimaConexionOK = millis();
@@ -455,7 +461,14 @@ void loop() {
         sendTopic = doc["topic"].as<String>();
       }
 
-      if (WiFi.status() == WL_CONNECTED && mqtt.connected()) {
+      if (en_wifi == 2 && WiFi.status() == WL_CONNECTED) {
+        if (enviarPorHTTPBridge(sendTopic, String(packetStr))) {
+          flash_mark_packet_sent();
+          mqttUltimaConexionOK = millis();
+        } else {
+          break;
+        }
+      } else if (WiFi.status() == WL_CONNECTED && mqtt.connected()) {
         if (publish_mqtt_json(sendTopic, String(packetStr))) {
           flash_mark_packet_sent();
           mqttUltimaConexionOK = millis(); //  Reset tambien con datos del buffer
@@ -498,6 +511,10 @@ void loop() {
         if (usarSerialBridge) {
           DVL_PRINTLN("[BRIDGE] Enviando sensor por UART2");
           SensorSerial.println(jsonsensor);
+        } else if (en_wifi == 2) {
+          if (!enviarPorHTTPBridge(topicSensor, jsonsensor)) {
+            flash_save_packet(jsonsensor.c_str());
+          }
         } else if (mqtt.connected()) {
           if (topicSensor.length() == 0 || jsonsensor.length() == 0) {
             DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
@@ -531,7 +548,11 @@ void loop() {
           sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat,
           ultimaLon, leer_tension_bateria(), leer_tension_principal(), numPkt);
 
-      if (mqtt.connected()) {
+      if (en_wifi == 2) {
+        if (!enviarPorHTTPBridge(topicSerial, jsonserial)) {
+          flash_save_packet(jsonserial.c_str());
+        }
+      } else if (mqtt.connected()) {
         if (topicSerial.length() == 0 || jsonserial.length() == 0) {
           DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
         } else {
@@ -558,6 +579,10 @@ void loop() {
       if (usarSerialBridge) {
         DVL_PRINTLN("[BRIDGE] Enviando Modbus por UART2");
         SensorSerial.println(jsonmodbus);
+      } else if (en_wifi == 2) {
+        if (!enviarPorHTTPBridge(topicModbus, jsonmodbus)) {
+          flash_save_packet(jsonmodbus.c_str());
+        }
       } else if (mqtt.connected()) {
         if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
           DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
@@ -581,6 +606,10 @@ void loop() {
       if (usarSerialBridge) {
         DVL_PRINTLN("[BRIDGE] Enviando ADC por UART2");
         SensorSerial.println(jsonadc);
+      } else if (en_wifi == 2) {
+        if (!enviarPorHTTPBridge(topicADC, jsonadc)) {
+          flash_save_packet(jsonadc.c_str());
+        }
       } else if (mqtt.connected()) {
         if (topicADC.length() == 0 || jsonadc.length() == 0) {
           DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
@@ -601,6 +630,8 @@ void loop() {
     if (usarSerialBridge) {
       DVL_PRINTLN("[BRIDGE] Enviando KeepAlive por UART2");
       SensorSerial.println(jsonKeepAlive);
+    } else if (en_wifi == 2) {
+      enviarPorHTTPBridge(topic1, jsonKeepAlive);
     } else if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }
@@ -631,7 +662,7 @@ void loop() {
   {
     static unsigned long ultimaActualizacionNTP = 0;
     const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
-    if (en_wifi && WiFi.status() == WL_CONNECTED &&
+    if (en_wifi == 1 && WiFi.status() == WL_CONNECTED &&
         (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > intervaloNTP))) {
       if (ultimaActualizacionNTP != 0) { // No re-sincronizar si recien arranco (ya se hizo en setup)
         DVL_PRINTLN("[NTP] Re-sincronizacion periodica...");
@@ -682,10 +713,21 @@ unsigned long obtener_y_avanzar_numero_paquete() {
 }
 
 void conectar_WiFi() {
+  if (en_wifi == 0) {
+    DVL_PRINTLN("WiFi deshabilitado por configuración (EN_WIFI=0).");
+    wifiConfigurado = false;
+    return;
+  }
 
-  DVL_PRINTLN("Intentando conectar a WiFi guardada...");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid.c_str(), password.c_str());
+  if (en_wifi == 2) {
+    DVL_PRINTLN("Intentando conectar al AP Bridge de LILY-GO (red oculta)...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin("LILYGO_BRIDGE_NET", "TCSA-Bridge-2026", 1, NULL, true);
+  } else {
+    DVL_PRINTLN("Intentando conectar a WiFi guardada...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), password.c_str());
+  }
 
   unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
@@ -700,5 +742,29 @@ void conectar_WiFi() {
   } else {
     DVL_PRINTLN("No se pudo conectar a WiFi. Esperando boton...");
     wifiConfigurado = false;
+  }
+}
+
+bool enviarPorHTTPBridge(String topic, String payload) {
+  if (WiFi.status() != WL_CONNECTED) {
+    DVL_PRINTLN("[BRIDGE CLIENT] No conectado a WiFi, no se puede enviar HTTP.");
+    return false;
+  }
+
+  HTTPClient http;
+  http.begin("http://192.168.4.1:8080/retransmit");
+  http.addHeader("Content-Type", "application/json");
+
+  DVL_PRINTLN("[BRIDGE CLIENT] Enviando HTTP POST...");
+  int httpCode = http.POST(payload);
+  http.end();
+
+  if (httpCode == 200) {
+    DVL_PRINTLN("[BRIDGE CLIENT] HTTP POST exitoso (200 OK)");
+    return true;
+  } else {
+    DVL_PRINT("[BRIDGE CLIENT] Falló HTTP POST. Código: ");
+    DVL_PRINTLN(httpCode);
+    return false;
   }
 }
