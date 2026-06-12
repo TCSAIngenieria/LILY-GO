@@ -8,6 +8,7 @@
 #include <Preferences.h>
 #include "MQTT.h"
 #include <WiFi.h>
+#include "BridgeAP.h"
 
 extern Preferences preferences;
 
@@ -330,19 +331,34 @@ String procesarComando(String comando) {
   else if (comando.startsWith("DVL+EN_WIFI=")) {
     String v = comando.substring(String("DVL+EN_WIFI=").length());
     v.trim();
-    en_wifi = (v == "1") ? 1 : 0;
+    int val = v.toInt();
+    if (val == 1) {
+      en_wifi = 1;
+    } else if (val == 2) {
+      en_wifi = 2;
+    } else {
+      en_wifi = 0;
+    }
 
     preferences.begin("enables", false);
     preferences.putUInt("wifi", en_wifi);
     preferences.end();
     if (en_wifi == 1) {
+      WiFi.softAPdisconnect(true);
       WiFi.mode(WIFI_STA);
       TINY_GSM_USE_WIFI = true;
       TINY_GSM_USE_GPRS = false;
-      respuesta = ">> HABILITADO WIFI (INTENTANDO CONEXION)";
+      respuesta = ">> HABILITADO WIFI CLIENTE (INTENTANDO CONEXION)";
+    } else if (en_wifi == 2) {
+      WiFi.disconnect(true);
+      TINY_GSM_USE_WIFI = false;
+      TINY_GSM_USE_GPRS = true;
+      iniciarBridgeAP();
+      respuesta = ">> HABILITADO WIFI AP BRIDGE";
     } else {
       TINY_GSM_USE_WIFI = false;
       TINY_GSM_USE_GPRS = true;
+      WiFi.softAPdisconnect(true);
       WiFi.disconnect(true);
       WiFi.mode(WIFI_OFF);
       respuesta = ">> DESHABILITADO WIFI (USANDO EXCLUSIVAMENTE MODEM)";

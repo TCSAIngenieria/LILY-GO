@@ -23,7 +23,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
 | `DVL+EN_MODEM=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módem celular (GPRS). | `DVL+EN_MODEM=1` |
 | `DVL+EN_GPS=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módulo de GPS/GNSS. | `DVL+EN_GPS=1` |
-| `DVL+EN_WIFI=<1\|0>` | Habilita (1) o deshabilita (0) el uso de la conexión WiFi. Al deshabilitar, opera sólo con módem. | `DVL+EN_WIFI=1` |
+| `DVL+EN_WIFI=<1\|0\|2>` | Configura la interfaz WiFi. 1: Modo Cliente estándar. 2: Modo AP Bridge oculto (retransmite JSONs, máx. 10 clientes). 0: Deshabilitado (sólo módem GPRS). | `DVL+EN_WIFI=2` |
 | `DVL+EXP_RESET` | Reinicia la placa expansora (ciclo de energía). | `DVL+EXP_RESET` |
 
 ## Comandos de Modbus

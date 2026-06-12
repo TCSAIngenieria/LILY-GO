@@ -30,6 +30,7 @@
 #include "Modbus.h"
 #include "SerialSecundario.h"
 #include "WebServerConfig.h"
+#include "BridgeAP.h"
 
 #ifdef DUMP_AT_COMMANDS
 #include <StreamDebugger.h>
@@ -352,9 +353,14 @@ void setup() {
 
   // La carga del WiFi se movio al principio del setup para verificar el modo AP
 
-  if (en_wifi && ssid.length() > 0) {
+  if (en_wifi == 1 && ssid.length() > 0) {
     conectar_WiFi();
-  } else if (!en_wifi) {
+  } else if (en_wifi == 2) {
+    wifiConfigurado = false;
+    TINY_GSM_USE_WIFI = false;
+    TINY_GSM_USE_GPRS = true;
+    iniciarBridgeAP();
+  } else {
     wifiConfigurado = false;
     TINY_GSM_USE_WIFI = false;
     TINY_GSM_USE_GPRS = true;
@@ -518,7 +524,7 @@ void loop() {
   if (faseGPRS_WIFI) {
 
     if (now - unahora >= (60 * 1000 * 60)) { // contador 1 hora
-      if (en_wifi) {
+      if (en_wifi == 1) {
         TINY_GSM_USE_WIFI = true;
         TINY_GSM_USE_GPRS = false;
       }
@@ -930,6 +936,9 @@ void loop() {
     modbus_loop();
   }
 
+  if (en_wifi == 2) {
+    mantenerBridgeAP();
+  }
   actualizarLED();
   esp_task_wdt_reset(); // Alimenta el WDT
 }
@@ -998,8 +1007,8 @@ unsigned long obtener_y_avanzar_numero_paquete() {
 }
 
 void conectar_WiFi() {
-  if (!en_wifi) {
-    DVL_PRINTLN("WiFi deshabilitado por configuración (EN_WIFI=0).");
+  if (en_wifi != 1) {
+    DVL_PRINTLN("WiFi no habilitado en modo Cliente (EN_WIFI != 1).");
     wifiConfigurado = false;
     TINY_GSM_USE_WIFI = false;
     TINY_GSM_USE_GPRS = true;
