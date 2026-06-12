@@ -102,10 +102,9 @@ void leerYRetransmitirSerial(Stream &serial) {
   static String jsonBuffer = "";
   static unsigned long lastRecvTime = 0;
 
-  // Si pasa demasiado tiempo (ej. 5 segundos) sin recibir nada nuevo,
-  // y hay datos acumulados, limpiamos el buffer por seguridad.
   if (jsonBuffer.length() > 0 && millis() - lastRecvTime > 5000) {
-    DVL_PRINTLN("[SERIAL] Timeout de buffer de retransmisión (datos descartados)");
+    DVL_PRINT("[SERIAL] Timeout de buffer de retransmisión. Descartado: ");
+    DVL_PRINTLN(jsonBuffer);
     jsonBuffer = "";
   }
 
