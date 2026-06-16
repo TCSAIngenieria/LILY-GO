@@ -18,7 +18,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 |:---|:---|:---|
 | `DVL+EN_SENSOR=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del sensor conectado (ej. DS18B20). | `DVL+EN_SENSOR=1` |
 | `DVL+EN_SERIAL=<0\|1\|2>` | 0=deshabilitado, 1=lectura expansora, 2=modo bridge (envía JSONs por UART2 cuando WiFi caído). Al habilitar 1 o 2, deshabilita Modbus. | `DVL+EN_SERIAL=2` |
-| `DVL+EN_WIFI=<1\|0>` | Habilita (1) o deshabilita (0) la conexión WiFi. Al deshabilitar, el dispositivo no intenta conectarse y usa el bridge serial si está configurado. | `DVL+EN_WIFI=0` |
+| `DVL+EN_WIFI=<0\|1\|2>` | Configura la interfaz WiFi. 0: Deshabilitada (usa bridge serial si está activo). 1: Cliente WiFi estándar (conecta a router local y publica por MQTT). 2: Cliente AP Bridge local (conecta automáticamente al AP oculto de la LILY-GO y publica por HTTP POST). | `DVL+EN_WIFI=2` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (1) o deshabilita (0) el módulo Modbus. Al habilitar Modbus, se deshabilita Serial. | `DVL+EN_MODBUS=1` |
 | `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Si el bridge serial (en_serial=2) está activo, se preserva. | `DVL+EN_BLE=1` |
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
@@ -113,3 +113,22 @@ DVL+EN_BLE=1             → Habilita escaneo BLE (se preserva el bridge)
 {"topic":"DVL/NODEMCU/OBU_123/DS18B20","ident":"OBU_123","temperatura":"25.3","date":"...", "Tension_bateria":4.12,"Tension_principal":5.0,"Version":"V05.02.03","index":1}
 {"topic":"DVL/NODEMCU/OBU_123","ident":"OBU_123","status":"keep-alive","date":"...", "Version":"V05.02.03","reboot_count":1,"conn_type":"","RSSI":""}
 ```
+
+---
+
+## Modo WiFi AP Bridge (EN_WIFI=2)
+
+Cuando se configura `DVL+EN_WIFI=2`, el dispositivo entra en **modo cliente de AP Bridge**. En este modo:
+
+- Se conecta de forma automática al SSID oculto `LILYGO_BRIDGE_NET` (con contraseña `TCSA-Bridge-2026`).
+- **No se conecta** de forma directa a un broker MQTT de Internet ni intenta sincronizar el reloj por NTP.
+- Toda la telemetría generada localmente (sensores, Modbus, ADC, KeepAlive) se envía mediante peticiones **HTTP POST** locales a `http://192.168.4.1:8080/retransmit`.
+- Si el AP Bridge no está disponible o falla el envío, los paquetes JSON se resguardan de forma segura en la Flash interna y se retransmiten cuando se restablece la comunicación.
+
+### Ejemplo de uso típico
+
+```
+DVL+EN_WIFI=2            → Habilita modo cliente de AP Bridge local
+DVL+EN_SENSOR=1          → Habilita lecturas de temperatura
+```
+
