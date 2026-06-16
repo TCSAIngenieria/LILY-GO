@@ -85,3 +85,13 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QEN_WIFI` | Consulta si el WiFi está habilitado. | `EN_WIFI=1` |
 | `DVL+QLAT` | Muestra la última latitud registrada. | `LAT=-34.60` |
 | `DVL+QLONG` | Muestra la última longitud registrada. | `LONG=-58.38` |
+
+## Detalles de Conectividad AP Bridge (Modo WiFi 2)
+
+Cuando se configura el dispositivo central LILY-GO con el comando `DVL+EN_WIFI=2`, se habilita una red local oculta para que las estaciones (NodeMCU) se asocien y transmitan datos de forma local:
+*   **SSID:** `LILYGO_BRIDGE_NET` (Oculto)
+*   **Contraseña (WPA2):** `TCSA-Bridge-2026`
+*   **Canal WiFi:** `1`
+*   **Límite de Clientes:** Máximo **10 conexiones concurrentes**
+*   **IP de LILY-GO (Gateway):** `192.168.4.1`
+*   **Servicio Web:** Servidor HTTP en el puerto `8080` con endpoint `/retransmit` (recibe peticiones HTTP POST con payload conteniendo `"topic"`).

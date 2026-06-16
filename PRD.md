@@ -58,11 +58,12 @@ graph TD
 *   **Watchdog por Hardware:** Watchdog Timer (WDT) configurado a **120 segundos** para reinicio en caso de cuelgues de red o del procesador.
 *   **Persistencia (NVS):** Uso de la biblioteca `Preferences` para el almacenamiento en memoria Flash de la configuración persistente (SSID, contraseña, IP del Broker, APN, ID del equipo, calibración del ADC y habilitaciones de módulos).
 
-### 3.2 Modos de Conectividad Dual (Smart Switching)
-El firmware gestiona dos interfaces de red con tolerancia a fallas de forma automática:
-1.  **Red Local (WiFi):** Interfaz preferida para comunicación de bajo costo. Las credenciales se configuran de forma dinámica en flash.
-2.  **Red Móvil (GPRS):** Utilizada como respaldo si no hay redes WiFi disponibles. Implementada usando el controlador `TinyGsm` sobre el módem celular SIM7000.
-3.  **Monitoreo de Enlace:** En caso de que se pierda la conexión MQTT por más de **5 minutos** (MQTT_TIMEOUT), el sistema fuerza un ciclo de reconexión profunda o reinicio de los periféricos asociados.
+### 3.2 Modos de Conectividad de Red y AP Bridge (Smart Switching)
+El firmware gestiona dos interfaces de red físicas (WiFi y GPRS celular) y permite tres modos de conectividad mediante el parámetro `en_wifi` persistido en la flash NVS:
+1.  **Modo 0 (WiFi Deshabilitado):** La radio WiFi se apaga por completo. El canal de comunicación de telemetría y diagnóstico del dispositivo opera única y exclusivamente a través del módem celular GPRS (SIM7000).
+2.  **Modo 1 (WiFi Cliente / STA):** Es el modo preferido para comunicación de bajo costo. El equipo actúa como cliente (STA) e intenta conectarse a la red WiFi local cuyas credenciales se encuentran en la flash. Si la conexión WiFi o al Broker MQTT falla, conmuta automáticamente a la red móvil GPRS como respaldo de datos.
+3.  **Modo 2 (AP Bridge / SoftAP):** El equipo actúa como Hub o Gateway local (ver Sección 6), levantando una red WiFi local oculta para recibir y retransmitir los datos de hasta 10 estaciones NodeMCU cliente. En este modo, el canal de salida al Broker MQTT externo se rutea permanentemente por el módem celular GPRS.
+4.  **Monitoreo de Enlace:** En caso de que se pierda la conexión MQTT por más de **5 minutos** (MQTT_TIMEOUT), el sistema fuerza un ciclo de reconexión profunda o reinicio de los periféricos asociados.
 
 ## 4. Módulos y Funcionalidades del Firmware
 
@@ -157,7 +158,53 @@ Emitido con información técnica del módem y estado de la red celular:
 }
 ```
 
-## 6. Configuración Local (Modo AP y Web Server)
+## 6. Topología en Estrella y Gateway Local (AP Bridge)
+
+Para escenarios industriales o de campo donde se despliegan múltiples estaciones de telemetría localmente y solo un dispositivo dispone de conectividad celular al exterior, el firmware de la LILY-GO implementa un modo Gateway local basado en una topología en estrella:
+
+```mermaid
+graph TD
+    subgraph Estaciones Clientes NodeMCU
+        N1[NodeMCU 1 - Sensores y Modbus]
+        N2[NodeMCU 2 - ADC]
+        N3[NodeMCU 3 - BLE Moko]
+    end
+
+    subgraph Puerta de Enlace LILY-GO Central Bridge
+        AP[WiFi SoftAP Oculto LILYGO_BRIDGE_NET]
+        Srv[Servidor HTTP Puerto 8080 retransmit]
+        Core[Procesamiento y Buffer Flash]
+        Modem[Modem GPRS SIM7000]
+    end
+
+    subgraph Nube
+        Broker[Broker MQTT Centralizado]
+    end
+
+    N1 -->|HTTP POST JSON WiFi| AP
+    N2 -->|HTTP POST JSON WiFi| AP
+    N3 -->|HTTP POST JSON WiFi| AP
+
+    AP --> Srv
+    Srv --> Core
+    Core -->|MQTT Publish| Modem
+    Modem -->|Red Celular GPRS| Broker
+```
+
+### 6.1 Parámetros de la Red Local (AP Bridge)
+Al configurar `en_wifi=2`, la LILY-GO inicializa su interfaz en modo Punto de Acceso (AP) con la siguiente configuración:
+*   **SSID:** `LILYGO_BRIDGE_NET` (SSID configurado como oculto para seguridad perimetral).
+*   **Contraseña (WPA2):** `TCSA-Bridge-2026`
+*   **Canal WiFi:** `1`
+*   **Límite de Clientes:** Máximo **10 conexiones concurrentes** administradas por hardware.
+*   **Servicio Web:** Se inicializa un servidor HTTP en el puerto **8080** que expone el endpoint `/retransmit` (recibe peticiones HTTP POST).
+
+### 6.2 Lógica de Retransmisión y Tolerancia a Fallos
+1.  **Recepción y Parseo:** El servidor HTTP local recibe el JSON crudo en formato POST. Valida que el JSON sea correcto y que incluya la clave obligatoria `"topic"`.
+2.  **Uplink Activo:** Si el módem celular GPRS tiene una sesión activa con el Broker MQTT central, la LILY-GO publica inmediatamente el payload recibido en el tópico correspondiente y retorna al cliente HTTP `200 OK`.
+3.  **Uplink Caído (Buffer en Flash):** Si la conexión MQTT al Broker no está disponible, la LILY-GO almacena el payload en su memoria Flash NVS (usando `flash_save_packet`), previniendo la pérdida de información de las estaciones remotas. En este escenario, responde al cliente HTTP `200 SAVED_OFFLINE`.
+
+## 7. Configuración Local (Modo AP y Web Server)
 
 Para la puesta en marcha inicial del dispositivo o en caso de fallos de red en campo:
 1.  **Activación Física:** Manteniendo presionado el botón conectado a **GPIO0 durante 5 segundos**, el microcontrolador guarda el indicador `forceAP` en Flash y se reinicia de manera segura en Modo Punto de Acceso (AP).
@@ -167,7 +214,7 @@ Para la puesta en marcha inicial del dispositivo o en caso de fallos de red en c
     *   Guardar la clave del WiFi y las credenciales MQTT (IP Broker y Puerto).
     *   Actualizar parámetros de telemetría sin necesidad de recompilar el firmware.
 
-## 7. Interfaz de Comandos de Control (CLI / MQTT)
+## 8. Interfaz de Comandos de Control (CLI / MQTT)
 
 El dispositivo responde a comandos enviados de forma directa por el puerto Serial Principal (UART0) o de forma remota a través del tópico MQTT de entrada `DVL/LILY-GO/<IDENTIFICADOR>/COMANDOS`. Las respuestas se publican en el tópico `/RESPUESTA` o por terminal.
 
