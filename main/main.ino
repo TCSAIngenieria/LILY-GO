@@ -34,7 +34,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V06.01.01";
+String versionado = "V06.02.02";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -757,14 +757,53 @@ bool enviarPorHTTPBridge(String topic, String payload) {
 
   DVL_PRINTLN("[BRIDGE CLIENT] Enviando HTTP POST...");
   int httpCode = http.POST(payload);
-  http.end();
-
+  
+  String responseBody = "";
   if (httpCode == 200) {
+    responseBody = http.getString();
     DVL_PRINTLN("[BRIDGE CLIENT] HTTP POST exitoso (200 OK)");
-    return true;
   } else {
     DVL_PRINT("[BRIDGE CLIENT] Falló HTTP POST. Código: ");
     DVL_PRINTLN(httpCode);
-    return false;
   }
+  
+  http.end();
+
+  if (httpCode == 200) {
+    int cmdIdx = responseBody.indexOf("|CMD:");
+    if (cmdIdx != -1) {
+      String comando = responseBody.substring(cmdIdx + 5);
+      DVL_PRINTLN("[BRIDGE CLIENT] Comando recibido por Bridge: " + comando);
+      
+      if (comando.startsWith("FOTA:")) {
+        String url = comando.substring(5);
+        DVL_PRINTLN("[BRIDGE CLIENT] Iniciando actualizacion FOTA desde: " + url);
+        FOTA.startUpdate(url);
+      } else {
+        String respuesta = procesarComando(comando);
+        
+        // Enviar respuesta de vuelta al Broker a traves del Gateway
+        String topicRespuesta = "DVL/NODEMCU/" + ident + "/RESPUESTA";
+        topicRespuesta.toUpperCase();
+        
+        StaticJsonDocument<256> respDoc;
+        respDoc["topic"] = topicRespuesta;
+        respDoc["ident"] = ident;
+        respDoc["response"] = respuesta;
+        
+        String respPayload;
+        serializeJson(respDoc, respPayload);
+        
+        static bool enviandoRespuesta = false;
+        if (!enviandoRespuesta) {
+          enviandoRespuesta = true;
+          enviarPorHTTPBridge(topicRespuesta, respPayload);
+          enviandoRespuesta = false;
+        }
+      }
+    }
+    return true;
+  }
+
+  return false;
 }
