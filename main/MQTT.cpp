@@ -6,6 +6,7 @@
 #include "esp_task_wdt.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
+#include "BridgeAP.h"
 
 #define LED_PIN 12
 const char *topicInit = "LilyGo/topicInit";
@@ -13,6 +14,7 @@ const char *latitud = "LilyGo/LAT";
 const char *longitud = "LilyGo/LONG";
 
 extern PubSubClient mqtt;
+extern uint en_wifi;
 extern FOTAClass FOTA;
 
 extern String ident;
@@ -36,13 +38,17 @@ boolean mqttConnect() {
     mqttActivo = true;
     mqttUltimaConexionOK = millis();
 
-    String topicFOTA = "DVL/LILY-GO/" + ident + "/FOTA";
-    String topicCMD = "DVL/LILY-GO/" + ident + "/COMANDOS";
-
-    mqtt.subscribe(topicFOTA.c_str());
-    mqtt.subscribe(topicCMD.c_str());
-
-    DVL_PRINTLN("📡 Suscripto a topics FOTA y COMANDOS");
+    if (en_wifi == 2) {
+      mqtt.subscribe("DVL/+/+/COMANDOS");
+      mqtt.subscribe("DVL/+/+/FOTA");
+      DVL_PRINTLN("📡 Modo AP Bridge: Suscripto a topics comodines FOTA y COMANDOS de satelites");
+    } else {
+      String topicFOTA = "DVL/LILY-GO/" + ident + "/FOTA";
+      String topicCMD = "DVL/LILY-GO/" + ident + "/COMANDOS";
+      mqtt.subscribe(topicFOTA.c_str());
+      mqtt.subscribe(topicCMD.c_str());
+      DVL_PRINTLN("📡 Modo Normal: Suscripto a topics FOTA y COMANDOS propios");
+    }
     esp_task_wdt_reset();
     return true;
   } else {
@@ -64,35 +70,75 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
   message.trim();
 
   String topicStr = String(topic);
+  
+  // Parsear el topico para ver si es para nosotros o para un satelite
+  // Estructura esperada: DVL/<TIPO>/<IDENT>/<ACCION>
+  int firstSlash = topicStr.indexOf('/');
+  int secondSlash = topicStr.indexOf('/', firstSlash + 1);
+  int thirdSlash = topicStr.indexOf('/', secondSlash + 1);
+  
+  if (firstSlash != -1 && secondSlash != -1 && thirdSlash != -1) {
+    String prefix = topicStr.substring(0, firstSlash);
+    String tipo = topicStr.substring(firstSlash + 1, secondSlash);
+    String targetIdent = topicStr.substring(secondSlash + 1, thirdSlash);
+    String action = topicStr.substring(thirdSlash + 1);
+    
+    if (prefix.equalsIgnoreCase("DVL")) {
+      if (targetIdent.equalsIgnoreCase(ident)) {
+        // Comando dirigido a nosotros mismos
+        if (action.equalsIgnoreCase("COMANDOS")) {
+          DVL_PRINTLN(" Comando MQTT recibido para mi: " + message);
+          String topicRespuesta = "DVL/LILY-GO/" + ident + "/RESPUESTA";
+          String respuesta = procesarComando(message);
+          if (mqtt.connected()) {
+            mqtt.publish(topicRespuesta.c_str(), respuesta.c_str());
+          }
+        } else if (action.equalsIgnoreCase("FOTA")) {
+          preferences.begin("fota", true);
+          String storedURL = preferences.getString("url", "");
+          preferences.end();
 
-  // FOTA
+          if (storedURL != message) {
+            DVL_PRINTLN(" Nueva URL FOTA detectada para mi. Iniciando actualizacion...");
+            FOTA.startUpdate(message);
+          } else {
+            DVL_PRINTLN("URL FOTA igual a la actual. Ignorando.");
+          }
+        }
+      } else {
+        // Comando dirigido a un satelite
+        String cmdMsg = message;
+        if (action.equalsIgnoreCase("FOTA")) {
+          cmdMsg = "FOTA:" + message; // Prefijar FOTA para que el satelite lo distinga
+        }
+        DVL_PRINTLN(" Comando MQTT recibido para satelite " + targetIdent + " (" + action + "): " + message);
+        agregarComandoCola(targetIdent, cmdMsg);
+      }
+      return;
+    }
+  }
+
+  // Fallback para topicos antiguos no estructurados
   if (topicStr.endsWith("/FOTA")) {
     preferences.begin("fota", true);
     String storedURL = preferences.getString("url", "");
     preferences.end();
 
     if (storedURL != message) {
-      DVL_PRINTLN(" Nueva URL FOTA detectada. Iniciando actualizacion...");
+      DVL_PRINTLN(" Nueva URL FOTA detectada (fallback). Iniciando actualizacion...");
       FOTA.startUpdate(message);
     } else {
       DVL_PRINTLN("URL FOTA igual a la actual. Ignorando.");
     }
   }
-
-  // COMANDOS
   else if (topicStr.endsWith("/COMANDOS")) {
-    DVL_PRINTLN(" Comando MQTT recibido: " + message);
-
-    // Construir topic de respuesta
+    DVL_PRINTLN(" Comando MQTT recibido (fallback): " + message);
     String topicRespuesta = "DVL/LILY-GO/" + ident + "/RESPUESTA";
-
     String respuesta = procesarComando(message);
-    // Publicar la respuesta en el topico
     if (mqtt.connected()) {
       mqtt.publish(topicRespuesta.c_str(), respuesta.c_str());
     }
   }
-
   else {
     DVL_PRINTLN(" Topico MQTT no manejado: " + topicStr);
   }
