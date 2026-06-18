@@ -9,7 +9,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
-| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA= http://midominio.com/firmware.bin` |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=https:// raw.githubusercontent.com/ TCSAIngenieria/FW_LILYGO/ main/NodeMCU_FW060204.bin` |
 | `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN=igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
