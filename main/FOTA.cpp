@@ -32,6 +32,7 @@ void FOTAClass::startUpdate(const String& url) {
   }
 
   HTTPClient http;
+  http.setTimeout(30000); // 30 segundos para dar tiempo al proxy GPRS
   WiFiClient normalClient;
   WiFiClientSecure secureClient;
 
