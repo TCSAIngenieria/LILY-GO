@@ -15,6 +15,7 @@ const char *longitud = "LilyGo/LONG";
 
 extern PubSubClient mqtt;
 extern uint en_wifi;
+extern String sateliteFotaUrl;
 extern FOTAClass FOTA;
 
 extern String ident;
@@ -109,7 +110,8 @@ void mqttCallback(char *topic, byte *payload, unsigned int len) {
         // Comando dirigido a un satelite
         String cmdMsg = message;
         if (action.equalsIgnoreCase("FOTA")) {
-          cmdMsg = "FOTA:" + message; // Prefijar FOTA para que el satelite lo distinga
+          cmdMsg = "FOTA:http://192.168.4.1:8080/fota_proxy";
+          sateliteFotaUrl = message; // Guardamos la URL externa original para el proxy
         }
         DVL_PRINTLN(" Comando MQTT recibido para satelite " + targetIdent + " (" + action + "): " + message);
         agregarComandoCola(targetIdent, cmdMsg);
@@ -149,6 +151,10 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
     DVL_PRINTLN("MQTT no conectado, no se puede publicar.");
     return false;
   }
+
+  // Si el cliente está conectado, actualizamos el temporizador de actividad de red
+  // para evitar reinicios por falsos fallos causados por retardos del módem (TinyGSM).
+  mqttUltimaConexionOK = millis();
 
   bool sent = mqtt.publish(topic.c_str(), jsonPayload.c_str());
   DVL_PRINT("Publicado JSON en topic ");

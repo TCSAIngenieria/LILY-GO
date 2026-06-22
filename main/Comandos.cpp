@@ -198,6 +198,32 @@ String procesarComando(String comando) {
     preferences.end();
     respuesta = "FOTA_INICIADA";
 
+  } else if (comando.startsWith("DVL+CFG_FOTA=")) {
+    String args = comando.substring(13);
+    int commaIdx = args.indexOf(',');
+    if (commaIdx != -1) {
+      unsigned long timeout = strtoul(args.substring(0, commaIdx).c_str(), NULL, 10);
+      int secure = args.substring(commaIdx + 1).toInt();
+      if (timeout > 0 && (secure == 0 || secure == 1)) {
+        preferences.begin("fota_cfg", false);
+        preferences.putULong("timeout", timeout);
+        preferences.putInt("secure", secure);
+        preferences.end();
+        respuesta = ">> FOTA CONFIGURADO: TIMEOUT=" + String(timeout) + "s, SEGURIDAD=" + String(secure);
+      } else {
+        respuesta = "ERROR: Valores invalidos. Formato: DVL+CFG_FOTA=<segundos>,<0|1>";
+      }
+    } else {
+      respuesta = "ERROR: Formato incorrecto. Formato: DVL+CFG_FOTA=<segundos>,<0|1>";
+    }
+
+  } else if (comando == "DVL+QCFG_FOTA") {
+    preferences.begin("fota_cfg", true);
+    unsigned long timeout = preferences.getULong("timeout", 600);
+    int secure = preferences.getInt("secure", 0);
+    preferences.end();
+    respuesta = "TIMEOUT=" + String(timeout) + " | SECURE=" + String(secure);
+
   } else if (comando == "DVL+VER") {
     respuesta = "VERSION=" + versionado;
 

@@ -9,7 +9,8 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
-| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http:// midominio.com/ firmware.bin` |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=https:// raw.githubusercontent.com/ TCSAIngenieria/FW_LILYGO/ main/NodeMCU_FW060204.bin` |
+| `DVL+CFG_FOTA=<timeout>,<secure>` | Configura el timeout de FOTA (segundos) y si usa conexión segura HTTPS (1) o insegura HTTP (0). | `DVL+CFG_FOTA=600,0` |
 | `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN= igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
@@ -79,6 +80,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QPARSE` | Muestra el separador configurado. | `SEPARATOR=,` |
 | `DVL+QBAUD` | Muestra la velocidad del puerto serial secundario. | `BAUD=4800` |
 | `DVL+QAPN` | Muestra el APN configurado para la conexión GPRS. | `APN=igprs.claro.com.ar` |
+| `DVL+QCFG_FOTA` | Muestra la configuración actual de timeout y seguridad de FOTA. | `TIMEOUT=600 \| SECURE=0` |
 | `DVL+QEN_ADC` | Consulta si el reporte independiente del ADC está habilitado. | `EN_ADC=1` |
 | `DVL+QEN_MODEM` | Consulta si el módem celular está habilitado. | `EN_MODEM=1` |
 | `DVL+QEN_GPS` | Consulta si el módulo de GPS está habilitado. | `EN_GPS=1` |

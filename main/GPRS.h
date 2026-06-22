@@ -29,6 +29,7 @@ void modemPowerOff();
 void modemRestart();
 bool isModemOn();
 void asegurarModemEncendido();
+void iniciarSerialModem();
 void initSD();
 void printModemInfo(TinyGsm &modem, String &res);
 void updateNetworkConnection(TinyGsm &modem);

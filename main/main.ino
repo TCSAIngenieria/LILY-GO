@@ -51,7 +51,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V05.02.01";
+String versionado = "V07.01.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -199,7 +199,7 @@ void buttonTaskTracker(void *pvParameters) {
 
 void setup() {
   SerialMon.begin(115200); // puerto serial primario
-  SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
+  iniciarSerialModem();
 
   preferences.begin("serial_cfg", true);
   serialBaud = preferences.getULong("baud", 4800);
