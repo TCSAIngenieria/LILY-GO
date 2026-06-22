@@ -8,7 +8,6 @@
 #include "esp_task_wdt.h"
 
 FOTAClass FOTA;
-WiFiClientSecure client;
 
 static bool updateStarted = false;  // Para evitar repetir la actualizacion
 
@@ -33,9 +32,16 @@ void FOTAClass::startUpdate(const String& url) {
   }
 
   HTTPClient http;
+  WiFiClient normalClient;
+  WiFiClientSecure secureClient;
+
   DVL_PRINTLN("Conectando al servidor...");
-  client.setInsecure();  // Desactiva validacion SSL (usar solo para pruebas)
-  http.begin(client, url);
+  if (url.startsWith("https://")) {
+    secureClient.setInsecure();  // Desactiva validacion SSL
+    http.begin(secureClient, url);
+  } else {
+    http.begin(normalClient, url);
+  }
 
   int httpCode = http.GET();
   if (httpCode != HTTP_CODE_OK) {
@@ -70,8 +76,21 @@ void FOTAClass::startUpdate(const String& url) {
   size_t written = 0;
   const size_t bufferSize = 512;
   uint8_t buff[bufferSize];
+  int ultimoPorcentajeX10 = -1;
+  unsigned long ultimoAvanceMs = millis();
+  size_t ultimoWritten = 0;
 
   while (http.connected() && written < (size_t)contentLength) {
+    // Control de timeout por falta de avance (10 minutos)
+    if (written > ultimoWritten) {
+      ultimoWritten = written;
+      ultimoAvanceMs = millis();
+    } else if (millis() - ultimoAvanceMs > 600000) { // 10 minutos
+      DVL_PRINTLN(" Error: FOTA sin avance por mas de 10 minutos. Reiniciando equipo...");
+      delay(1000);
+      ESP.restart();
+    }
+
     size_t available = stream->available();
     if (available) {
       size_t toRead = (available > bufferSize) ? bufferSize : available;
@@ -95,11 +114,14 @@ void FOTAClass::startUpdate(const String& url) {
 
       written += writtenBytes;
 
-      esp_task_wdt_reset();  // Resetea el watchdog
       yield();
       delay(1);
 
-      DVL_PRINTF("Descargado %d/%d bytes\n", (int)written, contentLength);
+      int porcentajeX10 = (written * 1000) / contentLength;
+      if (porcentajeX10 != ultimoPorcentajeX10) {
+        DVL_PRINTF("Descargando: %.1f%%\n", (float)porcentajeX10 / 10.0f);
+        ultimoPorcentajeX10 = porcentajeX10;
+      }
     } else {
       delay(1);
     }
