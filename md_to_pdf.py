@@ -88,6 +88,21 @@ def convert_md_to_pdf(md_filepath):
         print("Convirtiendo Markdown a HTML...")
         html_body = markdown.markdown(md_text, extensions=['tables', 'fenced_code'])
 
+        # Post-procesamiento: eliminar <code> dentro de <pre> para evitar que
+        # xhtml2pdf aplique el fondo gris del code inline sobre el fondo oscuro del pre.
+        html_body = re.sub(r'<pre><code[^>]*>', '<pre>', html_body)
+        html_body = html_body.replace('</code></pre>', '</pre>')
+
+        # Reemplazar caracteres █ por spans con fondo sólido (xhtml2pdf no renderiza bien █)
+        html_body = html_body.replace('█', '<span style="background-color:#8b9dc3;color:#8b9dc3;">█</span>')
+
+        # Forzar salto de página antes de la sección de Diagramas de Pulso
+        # para que la tabla de resumen quede en una página y los diagramas en otra
+        html_body = html_body.replace(
+            '<h2>2. Diagramas de Pulso',
+            '<div style="page-break-before: always;"></div><h2>2. Diagramas de Pulso'
+        )
+
         # CSS para dar un buen estilo, asegurando que las tablas no se desborden
         # y las imágenes se ajusten bien.
         css_style = """
@@ -165,21 +180,36 @@ def convert_md_to_pdf(md_filepath):
             background-color: #f8f9f9;
         }
         code {
-            background-color: #f2f4f4;
+            background-color: #ebedef;
             color: #c0392b;
-            padding: 2px 5px;
+            padding: 2px 4px;
             border-radius: 3px;
             font-family: "Courier New", Courier, monospace;
             font-size: 9.5pt;
         }
         pre {
-            background-color: #2c3e50;
-            color: #ecf0f1;
-            padding: 12px;
-            border-radius: 5px;
+            background-color: #1e2030;
+            color: #c8d3e6;
+            padding: 15px 18px;
+            border-radius: 6px;
+            border: 1px solid #3a4057;
             font-family: "Courier New", Courier, monospace;
             font-size: 9.5pt;
-            white-space: pre-wrap;
+            line-height: 1.6;
+            white-space: pre;
+            page-break-inside: avoid;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        pre code {
+            background-color: transparent;
+            color: #c8d3e6;
+            padding: 0;
+            border-radius: 0;
+            font-size: 9.5pt;
+            font-family: "Courier New", Courier, monospace;
+            white-space: pre;
         }
         img {
             max-width: 100%;
