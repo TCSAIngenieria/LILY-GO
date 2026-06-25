@@ -8,6 +8,7 @@
 
 
 void updateClockFromNTP_wifi();
+void updateClockFromBridge();
 String printCurrentTime();
 bool isTimeSet();
 

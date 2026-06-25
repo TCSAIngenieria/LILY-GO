@@ -34,7 +34,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V06.02.08";
+String versionado = "V06.04.02";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -296,6 +296,9 @@ void setup() {
   if (en_wifi == 1 && WiFi.status() == WL_CONNECTED) {
     DVL_PRINTLN("[NTP] Sincronizando hora al arrancar...");
     updateClockFromNTP_wifi();
+  } else if (en_wifi == 2 && WiFi.status() == WL_CONNECTED) {
+    DVL_PRINTLN("[Bridge] Sincronizando hora desde Gateway al arrancar...");
+    updateClockFromBridge();
   }
 
   lectura_flash();
@@ -648,9 +651,11 @@ void loop() {
 
   escucharComandos();
 
-  // Solo leo SerialSecundario en modo 1 (lectura de expansora)
+  // Solo leo SerialSecundario en modo 1 (lectura de expansora) o modo 2 (bridge serial)
   if (en_serial == 1) {
     leerSensorSerial(SensorSerial);
+  } else if (en_serial == 2 && WiFi.status() != WL_CONNECTED) {
+    escucharBridgeSerial(SensorSerial);
   }
 
   // Solo ciclo Modbus si está habilitado
@@ -658,15 +663,20 @@ void loop() {
     modbus_loop();
   }
 
-  // ---- RE-SINCRONIZACION NTP PERIODICA (cada 8 horas) ----
+  // ---- RE-SINCRONIZACION NTP / BRIDGE PERIODICA (cada 8 horas) ----
   {
     static unsigned long ultimaActualizacionNTP = 0;
     const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
-    if (en_wifi == 1 && WiFi.status() == WL_CONNECTED &&
+    if (WiFi.status() == WL_CONNECTED &&
         (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > intervaloNTP))) {
       if (ultimaActualizacionNTP != 0) { // No re-sincronizar si recien arranco (ya se hizo en setup)
-        DVL_PRINTLN("[NTP] Re-sincronizacion periodica...");
-        updateClockFromNTP_wifi();
+        if (en_wifi == 1) {
+          DVL_PRINTLN("[NTP] Re-sincronizacion periodica...");
+          updateClockFromNTP_wifi();
+        } else if (en_wifi == 2) {
+          DVL_PRINTLN("[Bridge] Re-sincronizacion periodica desde Gateway...");
+          updateClockFromBridge();
+        }
       }
       ultimaActualizacionNTP = now;
     }

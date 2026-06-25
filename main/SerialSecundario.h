@@ -3,3 +3,4 @@
 
 void leerSensorSerial(Stream &serial);
 void imprimirSensorValuesValidos();
+void escucharBridgeSerial(Stream &serial);

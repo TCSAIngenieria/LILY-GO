@@ -2,6 +2,8 @@
 #include "Debug.h"
 #include <time.h>
 #include <sys/time.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 
 
 
@@ -59,4 +61,38 @@ bool isTimeSet() {
   time_t now;
   time(&now);
   return (now > 10000);  // true si la hora es valida (posterior a 1970)
+}
+
+void updateClockFromBridge() {
+  if (WiFi.status() != WL_CONNECTED) {
+    DVL_PRINTLN("[NTP-Bridge] WiFi no conectado. No se puede sincronizar.");
+    return;
+  }
+
+  HTTPClient http;
+  http.begin("http://192.168.4.1:8080/time");
+  http.setTimeout(5000); // 5 segundos de timeout
+
+  DVL_PRINTLN("[NTP-Bridge] Sincronizando hora desde Gateway...");
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    payload.trim();
+    time_t nowTime = (time_t)payload.substring(0, 15).toInt();
+
+    if (nowTime > 10000) {
+      struct timeval tv = { .tv_sec = nowTime };
+      settimeofday(&tv, NULL);
+      DVL_PRINTLN("[NTP-Bridge] Sincronización exitosa desde Gateway.");
+      DVL_PRINTLN(ctime(&nowTime));
+    } else {
+      DVL_PRINTLN("[NTP-Bridge] Valor de hora inválido recibido del Gateway.");
+    }
+  } else {
+    DVL_PRINT("[NTP-Bridge] Fallo al obtener hora del Gateway. Código HTTP: ");
+    DVL_PRINTLN(httpCode);
+  }
+  http.end();
+  esp_task_wdt_reset();
 }
