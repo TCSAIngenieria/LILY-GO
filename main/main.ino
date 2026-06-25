@@ -663,22 +663,30 @@ void loop() {
     modbus_loop();
   }
 
-  // ---- RE-SINCRONIZACION NTP / BRIDGE PERIODICA (cada 8 horas) ----
+  // ---- SINCRONIZACION Y RE-SINCRONIZACION NTP / BRIDGE ----
   {
     static unsigned long ultimaActualizacionNTP = 0;
+    const unsigned long intervaloReintento = 30000; // 30 segundos si fallo o no esta seteada
     const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
-    if (WiFi.status() == WL_CONNECTED &&
-        (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > intervaloNTP))) {
-      if (ultimaActualizacionNTP != 0) { // No re-sincronizar si recien arranco (ya se hizo en setup)
-        if (en_wifi == 1) {
-          DVL_PRINTLN("[NTP] Re-sincronizacion periodica...");
-          updateClockFromNTP_wifi();
-        } else if (en_wifi == 2) {
-          DVL_PRINTLN("[Bridge] Re-sincronizacion periodica desde Gateway...");
-          updateClockFromBridge();
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      bool timeNeeded = !isTimeSet();
+      bool periodicNeeded = (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > intervaloNTP));
+      
+      if (timeNeeded || periodicNeeded) {
+        unsigned long cooldown = timeNeeded ? intervaloReintento : intervaloNTP;
+        
+        if (ultimaActualizacionNTP == 0 || (now - ultimaActualizacionNTP > cooldown)) {
+          if (en_wifi == 1) {
+            DVL_PRINTLN("[NTP] Sincronizando hora...");
+            updateClockFromNTP_wifi();
+          } else if (en_wifi == 2) {
+            DVL_PRINTLN("[Bridge] Sincronizando hora desde Gateway...");
+            updateClockFromBridge();
+          }
+          ultimaActualizacionNTP = now;
         }
       }
-      ultimaActualizacionNTP = now;
     }
   }
 
