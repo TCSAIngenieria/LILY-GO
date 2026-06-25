@@ -285,6 +285,12 @@ void handleFotaProxy() {
   ESP.restart();
 }
 
+void handleTime() {
+  time_t nowTime;
+  time(&nowTime);
+  bridgeServer.send(200, "text/plain", String(nowTime));
+}
+
 void iniciarBridgeAP() {
   DVL_PRINTLN("Iniciando AP Bridge...");
   
@@ -303,6 +309,7 @@ void iniciarBridgeAP() {
 
   bridgeServer.on("/retransmit", HTTP_POST, handleRetransmit);
   bridgeServer.on("/fota_proxy", HTTP_GET, handleFotaProxy);
+  bridgeServer.on("/time", HTTP_GET, handleTime);
   bridgeServer.begin();
   DVL_PRINTLN("[BRIDGE] Servidor HTTP de retransmisión iniciado en puerto 8080");
 }
