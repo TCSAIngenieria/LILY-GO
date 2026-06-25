@@ -51,7 +51,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.01.05";
+String versionado = "V07.01.06";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
