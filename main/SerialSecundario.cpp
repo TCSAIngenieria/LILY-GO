@@ -6,6 +6,8 @@
 #include "FOTA.h"
 #include "Comandos.h"
 
+extern String ident;
+
 String buffer = "";
 bool receiving = false;
 unsigned long ultimaLimpiezaBuffer = 0;
