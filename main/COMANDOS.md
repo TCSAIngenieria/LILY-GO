@@ -9,7 +9,8 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+RESET` | Reinicia el dispositivo ESP32. | `DVL+RESET` |
 | `DVL+ID=<id>` | Establece el Identificador del dispositivo. | `DVL+ID=OBU_123` |
 | `DVL+VER` | Devuelve la versión actual del firmware. | `DVL+VER` |
-| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=http:// midominio.com/ firmware.bin` |
+| `DVL+FOTA=<url>` | Inicia una actualización de firmware desde la URL especificada. | `DVL+FOTA=https:// raw.githubusercontent.com/ TCSAIngenieria/FW_LILYGO/ main/NodeMCU_FW060204.bin` |
+| `DVL+CFG_FOTA=<timeout>,<secure>` | Configura el timeout de FOTA (segundos) y si usa conexión segura HTTPS (1) o insegura HTTP (0). | `DVL+CFG_FOTA=600,0` |
 | `DVL+SAPN=<apn>` | Configura el APN de la red GPRS y lo guarda en la flash. | `DVL+SAPN= igprs.claro.com.ar` |
 
 ## Comandos de Configuración de Sensores y Módulos
@@ -23,6 +24,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |
 | `DVL+EN_MODEM=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módem celular (GPRS). | `DVL+EN_MODEM=1` |
 | `DVL+EN_GPS=<1\|0>` | Habilita (1) o deshabilita (0) el uso del módulo de GPS/GNSS. | `DVL+EN_GPS=1` |
+| `DVL+EN_WIFI=<1\|0\|2>` | Configura la interfaz WiFi. 1: Modo Cliente estándar. 2: Modo AP Bridge oculto (retransmite JSONs, máx. 10 clientes). 0: Deshabilitado (sólo módem GPRS). | `DVL+EN_WIFI=2` |
 | `DVL+EXP_RESET` | Reinicia la placa expansora (ciclo de energía). | `DVL+EXP_RESET` |
 
 ## Comandos de Modbus
@@ -78,8 +80,20 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | `DVL+QPARSE` | Muestra el separador configurado. | `SEPARATOR=,` |
 | `DVL+QBAUD` | Muestra la velocidad del puerto serial secundario. | `BAUD=4800` |
 | `DVL+QAPN` | Muestra el APN configurado para la conexión GPRS. | `APN=igprs.claro.com.ar` |
+| `DVL+QCFG_FOTA` | Muestra la configuración actual de timeout y seguridad de FOTA. | `TIMEOUT=600 \| SECURE=0` |
 | `DVL+QEN_ADC` | Consulta si el reporte independiente del ADC está habilitado. | `EN_ADC=1` |
 | `DVL+QEN_MODEM` | Consulta si el módem celular está habilitado. | `EN_MODEM=1` |
 | `DVL+QEN_GPS` | Consulta si el módulo de GPS está habilitado. | `EN_GPS=1` |
+| `DVL+QEN_WIFI` | Consulta si el WiFi está habilitado. | `EN_WIFI=1` |
 | `DVL+QLAT` | Muestra la última latitud registrada. | `LAT=-34.60` |
 | `DVL+QLONG` | Muestra la última longitud registrada. | `LONG=-58.38` |
+
+## Detalles de Conectividad AP Bridge (Modo WiFi 2)
+
+Cuando se configura el dispositivo central LILY-GO con el comando `DVL+EN_WIFI=2`, se habilita una red local oculta para que las estaciones (NodeMCU) se asocien y transmitan datos de forma local:
+*   **SSID:** `LILYGO_BRIDGE_NET` (Oculto)
+*   **Contraseña (WPA2):** `TCSA-Bridge-2026`
+*   **Canal WiFi:** `1`
+*   **Límite de Clientes:** Máximo **10 conexiones concurrentes**
+*   **IP de LILY-GO (Gateway):** `192.168.4.1`
+*   **Servicio Web:** Servidor HTTP en el puerto `8080` con endpoint `/retransmit` (recibe peticiones HTTP POST con payload conteniendo `"topic"`).

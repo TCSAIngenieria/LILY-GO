@@ -317,3 +317,53 @@ void getModemSignalInfo(TinyGsm &modem, String &rsrq, String &rsrp, String &rssi
     }
   }
 }
+
+void iniciarSerialModem() {
+  DVL_PRINTLN("[MODEM] Inicializando puerto serial (Auto-recuperacion)...");
+  
+  // Intentamos primero a la velocidad estandar de 115200
+  SerialAT.begin(115200, SERIAL_8N1, PIN_RX, PIN_TX);
+  delay(100);
+  
+  if (isModemOn()) {
+    DVL_PRINTLN("[MODEM] Comunicacion establecida a 115200 bps.");
+    return;
+  }
+  
+  // Si no responde, es muy probable que haya quedado configurado a 57600 bps.
+  // Probamos a 57600 bps para restaurarlo.
+  DVL_PRINTLN("[MODEM] No responde a 115200. Probando a 57600 para recuperacion...");
+  SerialAT.end();
+  delay(100);
+  SerialAT.begin(57600, SERIAL_8N1, PIN_RX, PIN_TX);
+  delay(100);
+  
+  if (isModemOn()) {
+    DVL_PRINTLN("[MODEM] Encontrado a 57600. Reconfigurando modem a 115200 bps...");
+    // Enviamos el comando para restaurar el baud rate a 115200 en el modem
+    SerialAT.println("AT+IPR=115200");
+    delay(200);
+    SerialAT.println("AT&W");
+    delay(200);
+    
+    // Ahora cambiamos la velocidad del ESP32 a 115200
+    SerialAT.end();
+    delay(100);
+    SerialAT.begin(115200, SERIAL_8N1, PIN_RX, PIN_TX);
+    delay(100);
+    
+    if (isModemOn()) {
+      DVL_PRINTLN("[MODEM] Modem recuperado y verificado a 115200 bps.");
+    } else {
+      DVL_PRINTLN("[MODEM] ERROR: No responde a 115200 bps luego de reconfigurar.");
+    }
+  } else {
+    DVL_PRINTLN("[MODEM] ERROR: El modem tampoco responde a 57600 bps.");
+    // Devolvemos al baud rate estandar por si acaso
+    SerialAT.end();
+    delay(100);
+    SerialAT.begin(115200, SERIAL_8N1, PIN_RX, PIN_TX);
+  }
+}
+
+

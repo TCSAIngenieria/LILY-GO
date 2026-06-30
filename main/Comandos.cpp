@@ -7,6 +7,8 @@
 #include "Modbus.h"
 #include <Preferences.h>
 #include "MQTT.h"
+#include <WiFi.h>
+#include "BridgeAP.h"
 
 extern Preferences preferences;
 
@@ -36,6 +38,9 @@ uint en_gps;
 extern unsigned long publishInterval;
 extern FOTAClass FOTA;
 uint32_t serialBaud = 4800;
+uint en_wifi;
+extern bool TINY_GSM_USE_WIFI;
+extern bool TINY_GSM_USE_GPRS;
 
 String procesarComando(String comando) {
   comando.trim();
@@ -193,6 +198,32 @@ String procesarComando(String comando) {
     preferences.end();
     respuesta = "FOTA_INICIADA";
 
+  } else if (comando.startsWith("DVL+CFG_FOTA=")) {
+    String args = comando.substring(13);
+    int commaIdx = args.indexOf(',');
+    if (commaIdx != -1) {
+      unsigned long timeout = strtoul(args.substring(0, commaIdx).c_str(), NULL, 10);
+      int secure = args.substring(commaIdx + 1).toInt();
+      if (timeout > 0 && (secure == 0 || secure == 1)) {
+        preferences.begin("fota_cfg", false);
+        preferences.putULong("timeout", timeout);
+        preferences.putInt("secure", secure);
+        preferences.end();
+        respuesta = ">> FOTA CONFIGURADO: TIMEOUT=" + String(timeout) + "s, SEGURIDAD=" + String(secure);
+      } else {
+        respuesta = "ERROR: Valores invalidos. Formato: DVL+CFG_FOTA=<segundos>,<0|1>";
+      }
+    } else {
+      respuesta = "ERROR: Formato incorrecto. Formato: DVL+CFG_FOTA=<segundos>,<0|1>";
+    }
+
+  } else if (comando == "DVL+QCFG_FOTA") {
+    preferences.begin("fota_cfg", true);
+    unsigned long timeout = preferences.getULong("timeout", 600);
+    int secure = preferences.getInt("secure", 0);
+    preferences.end();
+    respuesta = "TIMEOUT=" + String(timeout) + " | SECURE=" + String(secure);
+
   } else if (comando == "DVL+VER") {
     respuesta = "VERSION=" + versionado;
 
@@ -319,6 +350,44 @@ String procesarComando(String comando) {
       respuesta = ">> HABILITADO GPS";
     } else {
       respuesta = ">> DESHABILITADO GPS";
+    }
+  }
+
+  /*comando para habilitar o deshabilitar WiFi*/
+  else if (comando.startsWith("DVL+EN_WIFI=")) {
+    String v = comando.substring(String("DVL+EN_WIFI=").length());
+    v.trim();
+    int val = v.toInt();
+    if (val == 1) {
+      en_wifi = 1;
+    } else if (val == 2) {
+      en_wifi = 2;
+    } else {
+      en_wifi = 0;
+    }
+
+    preferences.begin("enables", false);
+    preferences.putUInt("wifi", en_wifi);
+    preferences.end();
+    if (en_wifi == 1) {
+      WiFi.softAPdisconnect(true);
+      WiFi.mode(WIFI_STA);
+      TINY_GSM_USE_WIFI = true;
+      TINY_GSM_USE_GPRS = false;
+      respuesta = ">> HABILITADO WIFI CLIENTE (INTENTANDO CONEXION)";
+    } else if (en_wifi == 2) {
+      WiFi.disconnect(true);
+      TINY_GSM_USE_WIFI = false;
+      TINY_GSM_USE_GPRS = true;
+      iniciarBridgeAP();
+      respuesta = ">> HABILITADO WIFI AP BRIDGE";
+    } else {
+      TINY_GSM_USE_WIFI = false;
+      TINY_GSM_USE_GPRS = true;
+      WiFi.softAPdisconnect(true);
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      respuesta = ">> DESHABILITADO WIFI (USANDO EXCLUSIVAMENTE MODEM)";
     }
   }
 
@@ -512,6 +581,12 @@ String procesarComando(String comando) {
     en_gps = preferences.getUInt("gps", 1);
     preferences.end();
     respuesta = "EN_GPS=" + String(en_gps);
+
+  } else if (comando == "DVL+QEN_WIFI") {
+    preferences.begin("enables", true);
+    en_wifi = preferences.getUInt("wifi", 1);
+    preferences.end();
+    respuesta = "EN_WIFI=" + String(en_wifi);
 
   } else if (comando.startsWith("EXP+")) {
     // Reenvia el comando al puerto serial secundario

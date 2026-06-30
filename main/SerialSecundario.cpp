@@ -4,6 +4,8 @@
 #include "MQTT.h"
 #include "Flash.h"
 #include <ArduinoJson.h>
+#include "BridgeAP.h"
+#include <time.h>
 
 extern String ident;
 
@@ -126,11 +128,53 @@ void leerYRetransmitirSerial(Stream &serial) {
         if (!error && doc.containsKey("topic")) {
           String sendTopic = doc["topic"].as<String>();
           
+          bool esRespuesta = false;
+          if (sendTopic.endsWith("/RESPUESTA") && doc.containsKey("response")) {
+            esRespuesta = true;
+          }
+
           if (mqtt.connected()) {
-            publish_mqtt_json(sendTopic, jsonBuffer);
+            if (esRespuesta) {
+              String rawResponse = doc["response"].as<String>();
+              mqtt.publish(sendTopic.c_str(), rawResponse.c_str());
+              DVL_PRINTLN("[SERIAL] Respuesta de satelite retransmitida cruda a MQTT");
+            } else {
+              publish_mqtt_json(sendTopic, jsonBuffer);
+            }
           } else {
-            flash_save_packet(jsonBuffer.c_str());
-            DVL_PRINTLN("[SERIAL] MQTT desconectado. Datos guardados en flash.");
+            if (!esRespuesta) {
+              flash_save_packet(jsonBuffer.c_str());
+              DVL_PRINTLN("[SERIAL] MQTT desconectado. Datos guardados en flash.");
+            }
+          }
+
+          // Enviar respuesta por serial al satélite con la hora y comando pendiente
+          time_t nowTime;
+          time(&nowTime);
+          
+          String senderIdent = "";
+          if (doc.containsKey("ident")) {
+            senderIdent = doc["ident"].as<String>();
+          }
+          
+          String cmdPendiente = "";
+          if (senderIdent.length() > 0) {
+            cmdPendiente = obtenerComandoCola(senderIdent);
+          }
+          
+          StaticJsonDocument<256> respDoc;
+          respDoc["epoch"] = nowTime;
+          if (cmdPendiente.length() > 0) {
+            respDoc["cmd"] = cmdPendiente;
+          }
+          
+          serializeJson(respDoc, serial);
+          serial.println(); // Delimitador de línea para la lectura del satélite
+          
+          if (cmdPendiente.length() > 0) {
+            DVL_PRINTLN("[SERIAL] Retransmisión OK. Enviado comando pendiente por serial: " + cmdPendiente);
+          } else {
+            DVL_PRINTLN("[SERIAL] Retransmisión OK. Enviada hora actual por serial.");
           }
         } else {
           DVL_PRINT("[SERIAL] JSON inválido o sin tópico. Descartado: ");
