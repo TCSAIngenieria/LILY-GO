@@ -5,8 +5,8 @@
 #include <DallasTemperature.h>
 #include "SensorInterface.h"
 
-#define ONE_WIRE_BUS 4
-#define SENSOR_POWER_PIN 25
+#define ONE_WIRE_BUS 14
+#define SENSOR_POWER_PIN 23
 
 class DS18B20 : public SensorInterface {
 public:
