@@ -22,8 +22,8 @@ String sensorValues[16]; // S0...S15
 
 extern HardwareSerial SensorSerial;
 extern HardwareSerial SensorSerial;
-extern float filterADC[3][2];
-extern float paramADC[3][2];
+extern float filterADC[2][2];
+extern float paramADC[2][2];
 extern int cantMed;
 extern uint16_t tADC;
 
@@ -67,7 +67,7 @@ String procesarComando(String comando) {
       float m = args.substring(firstComma + 1, secondComma).toFloat();
       float p = args.substring(secondComma + 1).toFloat();
 
-      if (n >= 0 && n < 3) {
+      if (n >= 0 && n < 2) {
         filterADC[n][0] = m;
         filterADC[n][1] = p;
 
@@ -80,7 +80,7 @@ String procesarComando(String comando) {
 
         respuesta = "FILTRO SETEADO OK";
       } else {
-        respuesta = "ERROR: Indice fuera de rango (0-2)";
+        respuesta = "ERROR: Indice fuera de rango (0-1)";
       }
     } else {
       respuesta = "ERROR: Formato incorrecto (n,m,p)";
@@ -98,7 +98,7 @@ String procesarComando(String comando) {
       float m = args.substring(firstComma + 1, secondComma).toFloat();
       float p = args.substring(secondComma + 1).toFloat();
 
-      if (n >= 0 && n < 3) {
+      if (n >= 0 && n < 2) {
         paramADC[n][0] = m;
         paramADC[n][1] = p;
 
@@ -111,7 +111,7 @@ String procesarComando(String comando) {
 
         respuesta = "FACTOR SETEADO OK";
       } else {
-        respuesta = "ERROR: Indice fuera de rango (0-2)";
+        respuesta = "ERROR: Indice fuera de rango (0-1)";
       }
     } else {
       respuesta = "ERROR: Formato incorrecto (n,m,p)";
@@ -463,14 +463,12 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+QFIL") {
     respuesta =
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
-        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]) +
-        " | FIL2=" + String(filterADC[2][0]) + "," + String(filterADC[2][1]);
+        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]);
 
   } else if (comando == "DVL+QFACTOR") {
     respuesta =
         "FAC0=" + String(paramADC[0][0]) + "," + String(paramADC[0][1]) +
-        " | FAC1=" + String(paramADC[1][0]) + "," + String(paramADC[1][1]) +
-        " | FAC2=" + String(paramADC[2][0]) + "," + String(paramADC[2][1]);
+        " | FAC1=" + String(paramADC[1][0]) + "," + String(paramADC[1][1]);
 
   } else if (comando.startsWith("DVL+SALI=")) {
     int val = comando.substring(9).toInt();
@@ -546,8 +544,7 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+QFIL") {
     respuesta =
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
-        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]) +
-        " | FIL2=" + String(filterADC[2][0]) + "," + String(filterADC[2][1]);
+        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]);
 
   } else if (comando == "DVL+QEN_SERIAL") {
     preferences.begin("enables", true);

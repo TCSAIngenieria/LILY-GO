@@ -2,19 +2,17 @@
 #include "Debug.h"
 #include <Preferences.h>
 
-#define ADC_PIN_BAT 34 // Ejemplo pin ADC para bateria (18650)
-#define ADC1_CH7 35    // Pin ADC1_CH7
-#define ADC1_CH0 36    // Pin ADC1_CH0
-#define ADC1_CH3 39    // Pin ADC1_CH3
+#define ADC_PIN_34 34  // Pin ADC
+#define ADC_PIN_39 39  // Pin ADC
 
 // Usados para sensores seriales
 // #define ADC1_CH4 32     // Pin ADC1_CH4
 // #define ADC1_CH5 33     // Pin ADC1_CH5
 
-extern float filterADC[3][2];
-extern float ADCValueAnt[3];
+extern float filterADC[2][2];
+extern float ADCValueAnt[2];
 extern int cantMed;
-extern float paramADC[3][2];
+extern float paramADC[2][2];
 
 // Conversor de ADC a Voltaje
 float readVoltage(int pin) {
@@ -26,12 +24,13 @@ float readVoltage(int pin) {
 // Inicializacion del ADC para lectura de voltaje
 void initADC() {
   analogReadResolution(12);
-  analogSetPinAttenuation(ADC_PIN_BAT, ADC_11db);
+  analogSetPinAttenuation(ADC_PIN_34, ADC_11db);
+  analogSetPinAttenuation(ADC_PIN_39, ADC_11db);
 
   Preferences preferences;
 
   preferences.begin("adc_config", true);
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 2; i++) {
     String keyMin = "fil_" + String(i) + "_0";
     String keyVal = "fil_" + String(i) + "_1";
     filterADC[i][0] = preferences.getFloat(keyMin.c_str(), filterADC[i][0]);
@@ -47,50 +46,15 @@ void initADC() {
   preferences.end();
 }
 
-// Lectura de voltaje de bateria
-float leer_tension_bateria() {
-  float raw = readVoltage(ADC_PIN_BAT);
-
-  // Ajuste por divisor resistivo: si 4.2V reales ⇒ 1.6V leidos
-  float batteryVoltage = raw * (4.2 / 2.56);
-
-  DVL_PRINT("Voltaje bateria estimado (18650): ");
-  DVL_PRINT(batteryVoltage);
-  DVL_PRINTLN(" V");
-
-  return batteryVoltage;
-}
-
-// Infiere la tension de alimentacion principal
-float leer_tension_principal() {
-  float batteryVoltage =
-      leer_tension_bateria(); // Ya retorna el valor corregido
-
-  // Si la bateria esta bien cargada (>4V reales aprox.)
-  if (batteryVoltage > 4) {
-    DVL_PRINTLN("Alimentacion principal estimada: 5.0 V");
-    return 5.0;
-  } else {
-    DVL_PRINTLN("Alimentacion principal estimada: 0.0 V");
-    return 0.0;
-  }
-}
-
-// Lectura de voltaje de ADC1_CH7
-float leer_tension_adc1_ch7() {
-  float raw = readVoltage(ADC1_CH7);
+// Lectura de voltaje de ADC pin 34
+float leer_tension_adc_pin_34() {
+  float raw = readVoltage(ADC_PIN_34);
   return raw;
 }
 
-// Lectura de voltaje de ADC1_CH0
-float leer_tension_adc1_ch0() {
-  float raw = readVoltage(ADC1_CH0);
-  return raw;
-}
-
-// Lectura de voltaje de ADC1_CH3
-float leer_tension_adc1_ch3() {
-  float raw = readVoltage(ADC1_CH3);
+// Lectura de voltaje de ADC pin 39
+float leer_tension_adc_pin_39() {
+  float raw = readVoltage(ADC_PIN_39);
   return raw;
 }
 
@@ -98,9 +62,8 @@ float leer_tension_adc1_ch3() {
 void procesarADC(float ADCValue[]) {
 
   // Leo valores de los ADC
-  ADCValue[0] = leer_tension_adc1_ch7();
-  ADCValue[1] = leer_tension_adc1_ch0();
-  ADCValue[2] = leer_tension_adc1_ch3();
+  ADCValue[0] = leer_tension_adc_pin_34();
+  ADCValue[1] = leer_tension_adc_pin_39();
 
   // Aplico filtro por minimo tolerable
   if (ADCValue[0] <= filterADC[0][0]) {
@@ -108,9 +71,6 @@ void procesarADC(float ADCValue[]) {
   }
   if (ADCValue[1] <= filterADC[1][0]) {
     ADCValue[1] = filterADC[1][1];
-  }
-  if (ADCValue[2] <= filterADC[2][0]) {
-    ADCValue[2] = filterADC[2][1];
   }
 
   // Aplico Alisado (MA)
@@ -120,11 +80,15 @@ void procesarADC(float ADCValue[]) {
   ADCValue[1] = ((ADCValueAnt[1] * (cantMed - 1)) + ADCValue[1]) / cantMed;
   ADCValueAnt[1] = ADCValue[1];
 
-  ADCValue[2] = ((ADCValueAnt[2] * (cantMed - 1)) + ADCValue[2]) / cantMed;
-  ADCValueAnt[2] = ADCValue[2];
-
   // Aplico Factor y Offset
   ADCValue[0] = (ADCValue[0] * paramADC[0][0]) + paramADC[0][1];
   ADCValue[1] = (ADCValue[1] * paramADC[1][0]) + paramADC[1][1];
-  ADCValue[2] = (ADCValue[2] * paramADC[2][0]) + paramADC[2][1];
+
+  // Limpio ruido residual cercano a cero para evitar notacion cientifica en MQTT.
+  if (ADCValue[0] > -0.001 && ADCValue[0] < 0.001) {
+    ADCValue[0] = 0.0;
+  }
+  if (ADCValue[1] > -0.001 && ADCValue[1] < 0.001) {
+    ADCValue[1] = 0.0;
+  }
 }

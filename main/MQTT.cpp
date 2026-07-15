@@ -253,7 +253,7 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
 }
 
 String create_mqtt_json_adc(String topic, String ident, String fechayhora, float adc0,
-                            float adc1, float adc2) {
+                            float adc1) {
   StaticJsonDocument<256> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
@@ -261,7 +261,6 @@ String create_mqtt_json_adc(String topic, String ident, String fechayhora, float
   doc["date"] = fechayhora;
   doc["adc0"] = adc0;
   doc["adc1"] = adc1;
-  doc["adc2"] = adc2;
 
   char payload[256];
   serializeJson(doc, payload);
@@ -274,14 +273,17 @@ String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
                                   unsigned long rebootCount,
                                   String connType, String connDetail,
                                   String imei, String imsi, String iccid,
-                                  String rsrq, String rsrp, String rssi) {
-  StaticJsonDocument<512> doc;
+                                  String rsrq, String rsrp, String rssi,
+                                  float Vbackup, float Vprincipal) {
+  StaticJsonDocument<768> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
+  doc["Tension_principal"] = Vprincipal;
+  doc["Tension_backup"] = Vbackup;
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
   doc["conn_type"] = connType;
@@ -293,7 +295,7 @@ String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
   doc["RSRP"] = rsrp;
   doc["RSSI"] = rssi;
 
-  char payload[512];
+  char payload[768];
   serializeJson(doc, payload);
   return String(payload);
 }

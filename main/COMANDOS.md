@@ -38,8 +38,8 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
-| `DVL+SFIL=<n>,<m>,<p>` | Configura el filtro para el canal ADC `n` (0-2). | `DVL+SFIL=0,0.5,10` |
-| `DVL+SFACTOR=<n>,<m>,<p>` | Configura el factor (m) y offset (p) para el canal ADC `n` (0-2). | `DVL+SFACTOR=0,1.0,0.0` |
+| `DVL+SFIL=<n>,<m>,<p>` | Configura el filtro para el canal ADC `n` (0-1). | `DVL+SFIL=0,0.5,10` |
+| `DVL+SFACTOR=<n>,<m>,<p>` | Configura el factor (m) y offset (p) para el canal ADC `n` (0-1). | `DVL+SFACTOR=0,1.0,0.0` |
 | `DVL+SALI=<val>` | Establece la cantidad de mediciones para el alisado (promedio). | `DVL+SALI=50` |
 | `DVL+STADC=<val>` | Establece el tiempo de muestreo ADC en ms (1-65000). | `DVL+STADC=100` |
 

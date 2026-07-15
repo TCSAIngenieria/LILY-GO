@@ -29,6 +29,7 @@
 #include "MQTT.h"
 #include "Modbus.h"
 #include "SerialSecundario.h"
+#include "TensionAlimentacion.h"
 #include "WebServerConfig.h"
 #include "BridgeAP.h"
 
@@ -51,7 +52,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.01.06";
+String versionado = "V07.15.07";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -160,11 +161,11 @@ const unsigned long Packets_read_Interval = 2000;
 unsigned long last_flash_read = 0;
 
 /*Variables para ADC*/
-float ADCValue[3];
-float filterADC[3][2] = {{0, 0}, {0, 0}, {0, 0}};
-float ADCValueAnt[3] = {0, 0, 0};
+float ADCValue[2];
+float filterADC[2][2] = {{0, 0}, {0, 0}};
+float ADCValueAnt[2] = {0, 0};
 int cantMed = 50;
-float paramADC[3][2] = {{1, 0}, {1, 0}, {1, 0}};
+float paramADC[2][2] = {{1, 0}, {1, 0}};
 uint16_t tADC = 1;
 uint16_t cADC = 0;
 
@@ -318,6 +319,7 @@ void setup() {
 
   flash_init();
   initADC();
+  initTensionAlimentacion();
 
   // Inicializacion del sensor
   sensor->begin();
@@ -858,7 +860,7 @@ void loop() {
       String topicADC = topic1 + "/ADC";
   topicADC.toUpperCase();
       String jsonadc = create_mqtt_json_adc(
-          topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
+          topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1]);
 
       if (mqtt.connected()) {
         if (publish_mqtt_json(topicADC, jsonadc)) {
@@ -907,7 +909,7 @@ void loop() {
     String jsonKeepAlive = create_mqtt_json_keepalive(
         topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
         rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
-        rsrp, rssi);
+        rsrp, rssi, leer_tension_bateria(), leer_tension_principal());
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }
