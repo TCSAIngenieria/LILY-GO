@@ -1,6 +1,8 @@
 #include "BLE_MOKO.h"
 #include "Debug.h"
+#include "MOKO_Door.h"
 
+#include "esp_task_wdt.h"
 #include <vector>
 
 static std::vector<MokoSensorData> _tempDataList;
@@ -122,6 +124,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       h4Data.accelZ = 0;
       h4Data.motion = 0;
       h4Data.door = 0;
+      h4Data.hasMotionStatus = false;
+      h4Data.hasDoorStatus = false;
       h4Data.tag_id = "";
       h4Data.uuid = "";
       h4Data.temperature = 0;
@@ -167,6 +171,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 uint16_t battMv = ((uint16_t)payload[frameStart + 3] << 8) | payload[frameStart + 4];
                 int battPct = constrain(map(battMv, 2000, 3600, 0, 100), 0, 100);
                 h4Data.batteryLevel = battPct;
+                h4Data.batteryMv = battMv;
                 
                 h4Data.deviceProperty = payload[frameStart + 5];
                 h4Data.switchStatus = payload[frameStart + 6];
@@ -233,6 +238,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 uint16_t battMv = ((uint16_t)payload[frameStart + 12] << 8) | payload[frameStart + 13];
                 int battPct = constrain(map(battMv, 2000, 3600, 0, 100), 0, 100);
                 h4Data.batteryLevel = battPct;
+                h4Data.batteryMv = battMv;
 
                 h4Data.tag_id = "";
                 for (int j = 15; j <= 20; j++) { // RFU byte skipped
@@ -268,6 +274,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 uint16_t battMv = ((uint16_t)payload[frameStart + 7] << 8) | payload[frameStart + 8];
                 int battPct = constrain(map(battMv, 2000, 3600, 0, 100), 0, 100);
                 h4Data.batteryLevel = battPct;
+                h4Data.batteryMv = battMv;
 
                 // Ranging data (Tx Power at 0m, signed int8, index 11 -> frameStart + 1)
                 h4Data.rangingData = (int8_t)payload[frameStart + 1];
@@ -321,6 +328,15 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       DVL_PRINTLN("================================================");
     }
     // ==================== END H4 PRO ====================
+
+    // ==================== MOKO Door/PIR advertising ====================
+    MokoSensorData doorData;
+    if (!isMoko &&
+        mokoDoorTryParseAdvertisement(advertisedDevice, doorData)) {
+      _tempDataList.push_back(doorData);
+      _foundDevice = true;
+    }
+    // ==================== END MOKO Door/PIR advertising ====================
 
     // Check for "PaPeR" in the advertised name
     bool isTarget = false;
@@ -391,6 +407,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         uint8_t statusByte = payloadVector[8];
         _tempData.motion = (statusByte >> 1) & 0x01;
         _tempData.door = (statusByte >> 0) & 0x01;
+        _tempData.hasMotionStatus = true;
 
         _tempData.accelX =
             (int16_t)((payloadVector[13] << 8) | payloadVector[14]);
@@ -534,9 +551,7 @@ void BLEMokoScanner::loop() {
         // If start returns true (async started), we wait
         while (pBLEScan->isScanning()) {
           delay(100);
-#ifdef ESP_TASK_WDT_len
           esp_task_wdt_reset();
-#endif
         }
       } else {
         DVL_PRINTLN("Fallo al iniciar pBLEScan->start()");

@@ -322,13 +322,33 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
     doc["frame_type"] = String(ftBuf);
   }
 
+  if (data.manufacturerId != 0) {
+    char mfgBuf[7];
+    sprintf(mfgBuf, "0x%04X", data.manufacturerId);
+    doc["manufacturer_id"] = String(mfgBuf);
+  }
+
   // Common or historically present fields (L02S, PaPeR, H4Pro general)
-  if (data.batteryLevel > 0) doc["% bat"] = data.batteryLevel;
+  if (data.rssi != 0) doc["rssi"] = data.rssi;
+  if (data.frameType == 0x81) {
+    if (data.batteryValid) {
+      doc["% bat"] = data.batteryLevel;
+      if (data.batteryMv > 0) doc["battery_mv"] = data.batteryMv;
+    }
+  } else {
+    if (data.batteryLevel > 0) doc["% bat"] = data.batteryLevel;
+    if (data.batteryMv > 0) doc["battery_mv"] = data.batteryMv;
+  }
   if (data.rangingData != 0) doc["ranging"] = data.rangingData;
   if (data.advInterval > 0) doc["adv_int"] = data.advInterval;
   if (data.deviceType != 0) doc["dev_type"] = data.deviceType;
-  if (data.motion > 0) doc["mov"] = data.motion;
-  if (data.door > 0) doc["door"] = data.door;
+  if (data.hasMotionStatus) doc["mov"] = data.motion;
+  if (data.hasDoorStatus) {
+    doc["door"] = data.door;
+    if (data.frameType == 0x81) doc["hall_raw"] = data.door;
+  }
+  if (data.hasDoorOpen) doc["door_open"] = data.doorOpen;
+  if (data.hasPirRaw) doc["pir_raw"] = data.pirRaw;
 
   // Frame-specific conditional additions
   switch (data.frameType) {
@@ -352,6 +372,17 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
     case 0x70:
       doc["temp"] = String(data.temperature, 2);
       doc["hum"] = String(data.humidity, 2);
+      break;
+    case 0x81:
+      doc["online"] = data.hasDoorStatus;
+      doc["door_valid"] = data.hasDoorStatus;
+      doc["pir_valid"] = data.pirValid;
+      doc["battery_valid"] = data.batteryValid;
+      doc["major"] = data.major;
+      doc["minor"] = data.minor;
+      doc["ibeacon_uuid"] = data.ibeaconUuid;
+      doc["rssi1m"] = data.rssi1m;
+      if (data.hasMotionStatus) doc["pir_motion"] = data.motion == 1;
       break;
     default:
       // If no specific MOKO frame type is set, it might be an older sensor

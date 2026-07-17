@@ -35,6 +35,7 @@ Este documento detalla todos los comandos disponibles en el sistema, su sintaxis
 | `DVL+EN_SENSOR` | Habilita la lectura del sensor principal. | `DVL+EN_SENSOR` |
 | `DVL+EN_SERIAL` | Habilita la lectura del puerto serial secundario. (Excluyente con Modbus). | `DVL+EN_SERIAL` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (`1`) o deshabilita (`0`) la funcionalidad Modbus. Al habilitar, deshabilita `EN_SERIAL`. | `DVL+EN_MODBUS=1` |
+| `DVL+EN_BLE=<1\|0>` | Habilita (`1`) o deshabilita (`0`) el escaneo y publicacion de sensores BLE. Al habilitar, deshabilita sensor, serial y Modbus. | `DVL+EN_BLE=1` |
 
 ### Actualización FOTA
 
@@ -121,6 +122,7 @@ Estos comandos devuelven el estado actual de las configuraciones.
 | `DVL+QEN_SENSOR`| `EN_SENSOR=1` | Estado de lectura de sensor. |
 | `DVL+QEN_SERIAL`| `EN_SERIAL=0` | Estado de puerto serial secundario. |
 | `DVL+QEN_MODBUS`| `EN_MODBUS=1` | Estado de Modbus. |
+| `DVL+QEN_BLE` | `EN_BLE=1` | Estado del escaneo y publicacion de sensores BLE. |
 | `DVL+QMODBUS` | `[OK] Ver detalle por Serial` | Imprime configuración Modbus detallada. |
 | `DVL+QFIL` | `FIL0=...` | Configuración de filtros ADC. |
 | `DVL+QFACTOR` | `FAC0=...` | Configuración de factores ADC. |

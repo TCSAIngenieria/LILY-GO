@@ -601,30 +601,9 @@ void loop() {
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
-        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
+        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
   topicBLE.toUpperCase();
-        switch (bleData.frameType) {
-        case 0x40:
-          topicBLE += "/Device_Info";
-          break;
-        case 0x50:
-          topicBLE += "/iBeacon";
-          break;
-        case 0x60:
-          topicBLE += "/3-axis_Acc";
-          break;
-        case 0x70:
-          topicBLE += "/T_and_H";
-          break;
-        default:
-          if (bleData.frameType != 0) {
-            char ftBuf[10];
-            sprintf(ftBuf, "/0x%02X", bleData.frameType);
-            topicBLE += String(ftBuf);
-          }
-          break;
-        }
 
         unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
@@ -801,57 +780,6 @@ void loop() {
         }
       } else {
         flash_save_packet(jsonmodbus.c_str());
-      }
-    }
-
-    if (en_ble == 1) {
-      // Logic for BLE MQTT Report
-      if (bleScanner.hasNewData()) {
-        std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
-
-        for (const auto &data : bleDataList) {
-          unsigned long numPkt = obtener_y_avanzar_numero_paquete();
-
-          DVL_PRINT("BLE Data found. Temp: ");
-          DVL_PRINT(data.temperature);
-          DVL_PRINTLN(" Sending MQTT...");
-
-          // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
-          String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
-          switch (data.frameType) {
-          case 0x40:
-            topicBLE += "/Device_Info";
-            break;
-          case 0x50:
-            topicBLE += "/iBeacon";
-            break;
-          case 0x60:
-            topicBLE += "/3-axis_Acc";
-            break;
-          case 0x70:
-            topicBLE += "/T_and_H";
-            break;
-          default:
-            if (data.frameType != 0) {
-              char ftBuf[10];
-              sprintf(ftBuf, "/0x%02X", data.frameType);
-              topicBLE += String(ftBuf);
-            }
-            break;
-          }
-
-          String jsonble = create_mqtt_json_ble(
-              topicBLE, ident, printCurrentTime(), data, ultimaLat, ultimaLon,
-              leer_tension_bateria(), leer_tension_principal(), numPkt);
-
-          if (mqtt.connected()) {
-            if (publish_mqtt_json(topicBLE, jsonble)) {
-              mqttUltimaConexionOK = millis();
-            }
-          } else {
-            flash_save_packet(jsonble.c_str());
-          }
-        }
       }
     }
 
