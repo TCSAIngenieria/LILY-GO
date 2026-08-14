@@ -33,7 +33,7 @@ Este documento detalla todos los comandos disponibles en el sistema, su sintaxis
 | Comando | Descripción | Ejemplo |
 | :--- | :--- | :--- |
 | `DVL+EN_SENSOR` | Habilita la lectura del sensor principal. | `DVL+EN_SENSOR` |
-| `DVL+EN_SERIAL` | Habilita la lectura del puerto serial secundario. (Excluyente con Modbus). | `DVL+EN_SERIAL` |
+| `DVL+EN_SERIAL=<0\|1\|2>` | Configura UART2: 0 deshabilitado, 1 lectura normal y 2 bridge/retransmisión. Los modos activos deshabilitan Modbus. | `DVL+EN_SERIAL=1` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (`1`) o deshabilita (`0`) la funcionalidad Modbus. Al habilitar, deshabilita `EN_SERIAL`. | `DVL+EN_MODBUS=1` |
 | `DVL+EN_BLE=<1\|0>` | Habilita (`1`) o deshabilita (`0`) el escaneo y publicacion de sensores BLE. Al habilitar, deshabilita sensor, serial y Modbus. | `DVL+EN_BLE=1` |
 
@@ -54,12 +54,12 @@ Este documento detalla todos los comandos disponibles en el sistema, su sintaxis
 
 ## 2. Configuración ADC (Analógico)
 
-Estos comandos permiten calibrar y configurar el comportamiento de las entradas analógicas (ADC0, ADC1, ADC2).
+Estos comandos permiten calibrar y configurar el comportamiento de las entradas analógicas (ADC0 y ADC1).
 
 ### Filtro (`SFIL`)
 Configura un filtro de umbral mínimo.
 - **Sintaxis:** `DVL+SFIL=n,m,p`
-  - `n`: Índice del canal (0-2).
+  - `n`: Índice del canal (0-1).
   - `m`: Umbral mínimo.
   - `p`: Valor de reemplazo si la lectura <= `m`.
 - **Ejemplo:** `DVL+SFIL=0,0.5,0.0` (Si ADC0 <= 0.5, leerá 0.0).
@@ -67,7 +67,7 @@ Configura un filtro de umbral mínimo.
 ### Factor de Calibración (`SFACTOR`)
 Ajusta la lectura con una ecuación lineal: `Valor = (Lectura * m) + p`.
 - **Sintaxis:** `DVL+SFACTOR=n,m,p`
-  - `n`: Índice del canal (0-2).
+  - `n`: Índice del canal (0-1).
   - `m`: Pendiente (factor multiplicativo).
   - `p`: Offset.
 - **Ejemplo:** `DVL+SFACTOR=1,1.05,0.2`

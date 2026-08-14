@@ -46,14 +46,14 @@ void initADC() {
   preferences.end();
 }
 
-// Lectura de voltaje de ADC pin 34
-float leer_tension_adc_pin_34() {
+// Lectura de la entrada ADC pin 34
+float leer_adc_pin_34() {
   float raw = readVoltage(ADC_PIN_34);
   return raw;
 }
 
-// Lectura de voltaje de ADC pin 39
-float leer_tension_adc_pin_39() {
+// Lectura de la entrada ADC pin 39
+float leer_adc_pin_39() {
   float raw = readVoltage(ADC_PIN_39);
   return raw;
 }
@@ -62,8 +62,8 @@ float leer_tension_adc_pin_39() {
 void procesarADC(float ADCValue[]) {
 
   // Leo valores de los ADC
-  ADCValue[0] = leer_tension_adc_pin_34();
-  ADCValue[1] = leer_tension_adc_pin_39();
+  ADCValue[0] = leer_adc_pin_34();
+  ADCValue[1] = leer_adc_pin_39();
 
   // Aplico filtro por minimo tolerable
   if (ADCValue[0] <= filterADC[0][0]) {

@@ -18,7 +18,7 @@ Este documento detalla todos los comandos disponibles para configurar y controla
 | Comando | Descripción | Ejemplo |
 |:---|:---|:---|
 | `DVL+EN_SENSOR=<1\|0>` | Habilita (1) o deshabilita (0) la lectura del sensor conectado (ej. DS18B20). | `DVL+EN_SENSOR=1` |
-| `DVL+EN_SERIAL=<1\|0\|2>` | Configura el puerto serial secundario. 1: Lectura normal de trama. 2: Retransmisión transparente de JSONs de NodeMCU al Broker. 0: Deshabilitado. | `DVL+EN_SERIAL=2` |
+| `DVL+EN_SERIAL=<0\|1\|2>` | Configura el puerto serial secundario. 0: deshabilitado. 1: lectura normal. 2: retransmisión transparente. El modo activo deshabilita Modbus porque comparten UART2. | `DVL+EN_SERIAL=1` |
 | `DVL+EN_MODBUS=<1\|0>` | Habilita (1) o deshabilita (0) el módulo Modbus. Al habilitar Modbus, se deshabilita Serial. | `DVL+EN_MODBUS=1` |
 | `DVL+EN_BLE=<1\|0>` | Habilita (1) o deshabilita (0) el escaneo de sensores BLE. Al habilitar, deshabilita otros sensores. | `DVL+EN_BLE=1` |
 | `DVL+EN_ADC=<1\|0>` | Habilita (1) o deshabilita (0) el envío independiente de reportes del ADC. | `DVL+EN_ADC=1` |

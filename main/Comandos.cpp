@@ -246,20 +246,24 @@ String procesarComando(String comando) {
     String v = comando.substring(String("DVL+EN_SERIAL=").length());
     v.trim();
     int val = v.toInt();
-    if (val == 1) {
-      en_serial = 1;
-    } else if (val == 2) {
-      en_serial = 2;
+    if (val == 1 || val == 2) {
+      en_serial = val;
     } else {
       en_serial = 0;
     }
     preferences.begin("enables", false);
     preferences.putUInt("serial", en_serial);
+    if (en_serial != 0) {
+      en_modbus = 0;
+      preferences.putUInt("modbus", 0);
+      modbus_set_enabled(false);
+    }
     preferences.end();
     if (en_serial == 1) {
-      respuesta = ">> HABILITADO LECTURA SERIAL";
+      respuesta = ">> HABILITADO LECTURA SERIAL (EN_MODBUS=0)";
     } else if (en_serial == 2) {
-      respuesta = ">> HABILITADO SERIAL BRIDGE / RETRANSMISION";
+      respuesta =
+          ">> HABILITADO SERIAL BRIDGE / RETRANSMISION (EN_MODBUS=0)";
     } else {
       respuesta = ">> DESHABILITADO LECTURA SERIAL";
     }

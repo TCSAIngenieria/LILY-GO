@@ -1,18 +1,21 @@
 #include "TensionAlimentacion.h"
 #include "Debug.h"
 
-#define PIN_ALIMENTACION_BACKUP 35
-#define PIN_ALIMENTACION_PRINCIPAL 36
-#define FACTOR_DIVISOR_RESISTIVO 2.0
-#define FACTOR_ALIMENTACION_BACKUP 1.0916039
-#define OFFSET_ALIMENTACION_BACKUP 0.0
-#define FACTOR_ALIMENTACION_PRINCIPAL 1.0813719
-#define OFFSET_ALIMENTACION_PRINCIPAL 0.0
+#define PIN_TENSION_BACKUP 35    // IO35 / VVBAT
+#define PIN_TENSION_PRINCIPAL 36 // GPIO36 / S_VP / SOLAR_IN
+#define FACTOR_DIVISOR_RESISTIVO 2.0f
+#define FACTOR_TENSION_BACKUP 0.9952f
+#define OFFSET_TENSION_BACKUP 0.0f
+#define FACTOR_TENSION_PRINCIPAL 0.991006f
+#define OFFSET_TENSION_PRINCIPAL 0.0f
+#define MUESTRAS_TENSION_ALIMENTACION 8
 
 static float readVoltageTensionAlimentacion(int pin) {
-  int adcValue = analogRead(pin);
-  float voltage = (adcValue / 4095.0) * 3.3;
-  return voltage;
+  uint32_t sumaMv = 0;
+  for (int i = 0; i < MUESTRAS_TENSION_ALIMENTACION; i++) {
+    sumaMv += analogReadMilliVolts(pin);
+  }
+  return (sumaMv / (float)MUESTRAS_TENSION_ALIMENTACION) / 1000.0f;
 }
 
 static float aplicarCalibracionTensionAlimentacion(float raw, float factor,
@@ -22,17 +25,17 @@ static float aplicarCalibracionTensionAlimentacion(float raw, float factor,
 
 void initTensionAlimentacion() {
   analogReadResolution(12);
-  analogSetPinAttenuation(PIN_ALIMENTACION_BACKUP, ADC_11db);
-  analogSetPinAttenuation(PIN_ALIMENTACION_PRINCIPAL, ADC_11db);
+  analogSetPinAttenuation(PIN_TENSION_BACKUP, ADC_11db);
+  analogSetPinAttenuation(PIN_TENSION_PRINCIPAL, ADC_11db);
 }
 
 // Lectura de voltaje de alimentacion backup
-float leer_tension_bateria() {
-  float raw = readVoltageTensionAlimentacion(PIN_ALIMENTACION_BACKUP);
+float leer_tension_backup() {
+  float raw = readVoltageTensionAlimentacion(PIN_TENSION_BACKUP);
   float voltage = aplicarCalibracionTensionAlimentacion(
-      raw, FACTOR_ALIMENTACION_BACKUP, OFFSET_ALIMENTACION_BACKUP);
+      raw, FACTOR_TENSION_BACKUP, OFFSET_TENSION_BACKUP);
 
-  DVL_PRINT("Voltaje alimentacion backup: ");
+  DVL_PRINT("Tension_backup (IO35/VVBAT): ");
   DVL_PRINT(voltage);
   DVL_PRINTLN(" V");
 
@@ -41,11 +44,11 @@ float leer_tension_bateria() {
 
 // Lectura de voltaje de alimentacion principal
 float leer_tension_principal() {
-  float raw = readVoltageTensionAlimentacion(PIN_ALIMENTACION_PRINCIPAL);
+  float raw = readVoltageTensionAlimentacion(PIN_TENSION_PRINCIPAL);
   float voltage = aplicarCalibracionTensionAlimentacion(
-      raw, FACTOR_ALIMENTACION_PRINCIPAL, OFFSET_ALIMENTACION_PRINCIPAL);
+      raw, FACTOR_TENSION_PRINCIPAL, OFFSET_TENSION_PRINCIPAL);
 
-  DVL_PRINT("Voltaje alimentacion principal: ");
+  DVL_PRINT("Tension_principal (GPIO36/SOLAR_IN): ");
   DVL_PRINT(voltage);
   DVL_PRINTLN(" V");
 

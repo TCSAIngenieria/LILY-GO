@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-float leer_tension_bateria();
+float leer_tension_backup();
 float leer_tension_principal();
 void initTensionAlimentacion();
 

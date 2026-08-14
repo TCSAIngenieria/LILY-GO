@@ -52,7 +52,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.15.07";
+String versionado = "V07.16.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -225,6 +225,10 @@ void setup() {
   en_wifi = preferences.getUInt("wifi", 1);
   preferences.end();
 
+  if (en_serial > 2) {
+    en_serial = 0;
+  }
+
   // --- Contador de reinicios y Lectura de AP Mode ---
   preferences.begin("device", false);
   bool forceAP = preferences.getBool("forceAP", false);
@@ -243,6 +247,8 @@ void setup() {
   // password = preferences.getString("password", "Ayanami84");
   ssid = preferences.getString("ssid", "Invitados");
   password = preferences.getString("password", "TCinvitados");
+  // ssid = preferences.getString("ssid", "TCSA");
+  // password = preferences.getString("password", "ccreto3236TAM");
   preferences.end();
   if (forceAP) {
     Serial.println("\n===============================================");
@@ -343,7 +349,8 @@ void setup() {
   /*CONFIGURACIoN WEB SERVER ADMIN*/
   preferences.begin("mqtt", true);
   MQTT_BROKER = preferences.getString(
-      "ip", "iot.tcsa.com.ar"); // ← solo usa este si no hay guardado
+      // "ip", "192.168.7.24"); // ← solo usa este si no hay guardado
+      "ip", "iot.tcsa.com.ar");
   MQTT_PORT = preferences.getInt("port", 1883); // ← idem
   preferences.end();
 
@@ -609,7 +616,7 @@ void loop() {
 
         String jsonBLE = create_mqtt_json_ble(
             topicBLE, ident, printCurrentTime(), bleData, ultimaLat, ultimaLon,
-            leer_tension_bateria(), leer_tension_principal(), numPkt);
+            leer_tension_backup(), leer_tension_principal(), numPkt);
 
         if (mqtt.connected()) {
           if (publish_mqtt_json(topicBLE, jsonBLE)) {
@@ -701,7 +708,7 @@ void loop() {
 
         String jsonsensor = create_mqtt_json_sensor(
             topicSensor, ident, valorStr, printCurrentTime(),
-            leer_tension_bateria(), leer_tension_principal(), numPkt);
+            leer_tension_backup(), leer_tension_principal(), numPkt);
 
         if (mqtt.connected()) {
 
@@ -739,7 +746,7 @@ void loop() {
           sensorValues[7], sensorValues[8], sensorValues[9], sensorValues[10],
           sensorValues[11], sensorValues[12], sensorValues[13],
           sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat,
-          ultimaLon, leer_tension_bateria(), leer_tension_principal(), numPkt);
+          ultimaLon, leer_tension_backup(), leer_tension_principal(), numPkt);
 
       if (mqtt.connected()) {
 
@@ -768,7 +775,7 @@ void loop() {
   topicModbus.toUpperCase();
       String jsonmodbus = create_mqtt_json_modbus(
           topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
-          leer_tension_bateria(), leer_tension_principal(), numPkt);
+          leer_tension_backup(), leer_tension_principal(), numPkt);
 
       if (mqtt.connected()) {
         if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
@@ -837,7 +844,7 @@ void loop() {
     String jsonKeepAlive = create_mqtt_json_keepalive(
         topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
         rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
-        rsrp, rssi, leer_tension_bateria(), leer_tension_principal());
+        rsrp, rssi, leer_tension_backup(), leer_tension_principal());
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }
