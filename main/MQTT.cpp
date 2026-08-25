@@ -314,15 +314,15 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
   doc["date"] = fechayhora;
   doc["index"] = numeroPaquete;
   
-  if (data.rawHex.length() > 0) doc["rawHex"] = data.rawHex;
+  if (data.frameType != 0x81 && data.rawHex.length() > 0) doc["rawHex"] = data.rawHex;
 
-  if (data.frameType != 0) {
+  if (data.frameType != 0 && data.frameType != 0x81) {
     char ftBuf[5];
     sprintf(ftBuf, "0x%02X", data.frameType);
     doc["frame_type"] = String(ftBuf);
   }
 
-  if (data.manufacturerId != 0) {
+  if (data.frameType != 0x81 && data.manufacturerId != 0) {
     char mfgBuf[7];
     sprintf(mfgBuf, "0x%04X", data.manufacturerId);
     doc["manufacturer_id"] = String(mfgBuf);
@@ -345,10 +345,9 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
   if (data.hasMotionStatus) doc["mov"] = data.motion;
   if (data.hasDoorStatus) {
     doc["door"] = data.door;
-    if (data.frameType == 0x81) doc["hall_raw"] = data.door;
   }
   if (data.hasDoorOpen) doc["door_open"] = data.doorOpen;
-  if (data.hasPirRaw) doc["pir_raw"] = data.pirRaw;
+  if (data.frameType != 0x81 && data.hasPirRaw) doc["pir_raw"] = data.pirRaw;
 
   // Frame-specific conditional additions
   switch (data.frameType) {
@@ -374,15 +373,9 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
       doc["hum"] = String(data.humidity, 2);
       break;
     case 0x81:
-      doc["online"] = data.hasDoorStatus;
-      doc["door_valid"] = data.hasDoorStatus;
-      doc["pir_valid"] = data.pirValid;
-      doc["battery_valid"] = data.batteryValid;
-      doc["major"] = data.major;
-      doc["minor"] = data.minor;
       doc["ibeacon_uuid"] = data.ibeaconUuid;
-      doc["rssi1m"] = data.rssi1m;
       if (data.hasMotionStatus) doc["pir_motion"] = data.motion == 1;
+      doc["battery_valid"] = data.batteryValid;
       break;
     default:
       // If no specific MOKO frame type is set, it might be an older sensor
