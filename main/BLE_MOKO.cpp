@@ -27,10 +27,6 @@ static int batteryPercentFromMilliVolts(uint16_t battMv) {
 
 static bool mokoDoorTryParseAdvertisement(
     const NimBLEAdvertisedDevice *device, MokoSensorData &data) {
-  if (!device->haveName() ||
-      device->getName().find("PaPeR") == std::string::npos) {
-    return false;
-  }
 
   if (!device->haveManufacturerData()) {
     return false;
@@ -107,11 +103,18 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
     DVL_PRINT(" RSSI: ");
     DVL_PRINTLN(advertisedDevice->getRSSI());
 
+    if (!advertisedDevice->haveName() ||
+        advertisedDevice->getName().find("DVL") == std::string::npos) {
+      return;
+    }
+
     std::string macAddress = advertisedDevice->getAddress().toString();
 
     // ==================== MOKO BEACONX PRO (H4 Pro) ====================
     bool isMoko = false;
     const std::vector<uint8_t> &payload_check = advertisedDevice->getPayload();
+    bool isEa01 = payload_check.size() >= 31 && payload_check[4] == 0x16 &&
+                  payload_check[5] == 0x01 && payload_check[6] == 0xEA;
     for (size_t i = 0; i + 1 < payload_check.size(); i++) {
       if (payload_check[i] == 0x16 && i + 3 < payload_check.size() &&
           payload_check[i + 1] == 0xAB && payload_check[i + 2] == 0xFE) {
@@ -416,27 +419,21 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       _tempDataList.push_back(h4Data);
       _foundDevice = true;
       DVL_PRINTLN("================================================");
+      return;
     }
     // ==================== END H4 PRO ====================
 
     // ==================== MOKO Door/PIR advertising ====================
     MokoSensorData doorData;
-    if (!isMoko &&
-        mokoDoorTryParseAdvertisement(advertisedDevice, doorData)) {
+    if (mokoDoorTryParseAdvertisement(advertisedDevice, doorData)) {
       _tempDataList.push_back(doorData);
       _foundDevice = true;
       return;
     }
     // ==================== END MOKO Door/PIR advertising ====================
 
-    // Check for "PaPeR" in the advertised name
-    bool isTarget = false;
-    if (advertisedDevice->haveName() && advertisedDevice->getName().find("PaPeR") != std::string::npos) {
-        isTarget = true;
-    }
-
-    if (isTarget) {
-      DVL_PRINTLN(">>> TARGET DEVICE FOUND (PaPeR) <<<");
+    if (isEa01) {
+      DVL_PRINTLN(">>> TARGET DEVICE FOUND (DVL/EA01) <<<");
       DVL_PRINT("MAC: ");
       DVL_PRINTLN(macAddress.c_str());
       DVL_PRINT("RSSI: ");
@@ -477,8 +474,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       const std::vector<uint8_t> &payloadVector =
           advertisedDevice->getPayload();
 
-      // PARSEO ESPECIFICO PARA MOKO L02S / PaPeR (Service Data 0xEA01)
-      if (payloadVector.size() >= 28) {
+      // PARSEO ESPECIFICO PARA MOKO L02S (Service Data 0xEA01)
+      if (payloadVector.size() >= 31) {
         MokoSensorData _tempData;
 
         int16_t tempRaw =
@@ -517,7 +514,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
         _tempData.uuid = "EA01";
 
-        DVL_PRINTF("[PaPeR] Parsed -> Temp: %.2f C, Hum: %.2f %%, Bat: "
+        DVL_PRINTF("[DVL/EA01] Parsed -> Temp: %.2f C, Hum: %.2f %%, Bat: "
                       "%d%%, D: %d, M: %d, X: %.0f, Y: %.0f, Z: %.0f\n",
                       _tempData.temperature, _tempData.humidity, battPct,
                       _tempData.door, _tempData.motion, _tempData.accelX,
@@ -533,7 +530,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
 
         _tempData.valid = true;
-        _tempData.name = "PaPeR";
+        _tempData.name = advertisedDevice->getName().c_str();
         String cleanMac = macAddress.c_str();
         cleanMac.replace(":", "");
         _tempData.mac = cleanMac;
@@ -542,14 +539,15 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
 
         _tempDataList.push_back(_tempData);
         _foundDevice = true;
+        return;
       }
 
       DVL_PRINTLN("------------------------------------------------");
     }
 
-    if (advertisedDevice->haveName() &&
-        advertisedDevice->getName().rfind("L02", 0) == 0) {
-      DVL_PRINT("BLE: L02S device found! Name: ");
+    if (advertisedDevice->haveManufacturerData() &&
+        advertisedDevice->getManufacturerData().length() == 7) {
+      DVL_PRINT("BLE: DVL L02 device found! Name: ");
       DVL_PRINTLN(advertisedDevice->getName().c_str());
       DVL_PRINT("RSSI: ");
       DVL_PRINTLN(advertisedDevice->getRSSI());
