@@ -18,7 +18,7 @@ graph TD
         EXP[Placa Expansora Serial UART2]
         MB[Dispositivos Modbus RTU]
         BLE[Sensores BLE Moko L02S/PaPeR/H4Pro]
-        ADC[ADC Interno de 3 Canales]
+        ADC[ADC Interno de 2 Canales: GPIO34/GPIO39]
     end
 
     subgraph Core CPU
@@ -89,7 +89,7 @@ El dispositivo cuenta con un diseño de firmware modular habilitable bajo demand
 *   *Exclusión Mutua:* La habilitación de Modbus (`en_modbus=1`) apaga de forma segura el módulo Serial Secundario ordinario para evitar conflictos en la UART2 compartida.
 
 ### 4.5 Módulo de Lectura Analógica (ADC)
-*   Monitoreo de hasta **3 canales analógicos** independientes (ADC0, ADC1, ADC2).
+*   Monitoreo de **2 canales analógicos** independientes: ADC0 en GPIO34 y ADC1 en GPIO39.
 *   **Calibración Dinámica:** Factores de conversión lineales e individuales (pendiente $m$ y offset $p$) mediante la fórmula:
     
     `Valor Calibrado = (Lectura Cruda * m) + p`
@@ -112,7 +112,7 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Tension_bateria": 4.15,
+  "Tension_backup": 4.15,
   "Tension_principal": 12.2,
   "Version": "V04.01.02",
   "index": 482
@@ -129,7 +129,7 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Tension_bateria": 4.12,
+  "Tension_backup": 4.12,
   "Tension_principal": 12.0,
   "Version": "V04.01.02",
   "index": 483

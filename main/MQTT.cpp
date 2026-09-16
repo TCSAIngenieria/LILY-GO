@@ -168,14 +168,14 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
 
 String create_mqtt_json_sensor(String topic, String ident,
                                String valor_variable, String fechayhora,
-                               float Vbateria,
+                               float Vbackup,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<256> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
   doc["date"] = fechayhora;
-  doc["Tension_bateria"] = Vbateria;
+  doc["Tension_backup"] = Vbackup;
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
@@ -190,7 +190,7 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
                                String S6, String S7, String S8, String S9,
                                String S10, String S11, String S12, String S13,
                                String S14, String S15, String fechayhora,
-                               String latitud, String longitud, float Vbateria,
+                               String latitud, String longitud, float Vbackup,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
   doc["topic"] = topic;
@@ -214,7 +214,7 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
-  doc["Tension_bateria"] = Vbateria;
+  doc["Tension_backup"] = Vbackup;
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
@@ -225,7 +225,7 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
 }
 
 String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
-                               String latitud, String longitud, float Vbateria,
+                               String latitud, String longitud, float Vbackup,
                                float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
   doc["topic"] = topic;
@@ -242,7 +242,7 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
-  doc["Tension_bateria"] = Vbateria;
+  doc["Tension_backup"] = Vbackup;
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
@@ -253,7 +253,7 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
 }
 
 String create_mqtt_json_adc(String topic, String ident, String fechayhora, float adc0,
-                            float adc1, float adc2) {
+                            float adc1) {
   StaticJsonDocument<256> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
@@ -261,7 +261,6 @@ String create_mqtt_json_adc(String topic, String ident, String fechayhora, float
   doc["date"] = fechayhora;
   doc["adc0"] = adc0;
   doc["adc1"] = adc1;
-  doc["adc2"] = adc2;
 
   char payload[256];
   serializeJson(doc, payload);
@@ -274,14 +273,17 @@ String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
                                   unsigned long rebootCount,
                                   String connType, String connDetail,
                                   String imei, String imsi, String iccid,
-                                  String rsrq, String rsrp, String rssi) {
-  StaticJsonDocument<512> doc;
+                                  String rsrq, String rsrp, String rssi,
+                                  float Vbackup, float Vprincipal) {
+  StaticJsonDocument<768> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
+  doc["Tension_principal"] = Vprincipal;
+  doc["Tension_backup"] = Vbackup;
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
   doc["conn_type"] = connType;
@@ -293,14 +295,14 @@ String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
   doc["RSRP"] = rsrp;
   doc["RSSI"] = rssi;
 
-  char payload[512];
+  char payload[768];
   serializeJson(doc, payload);
   return String(payload);
 }
 
 String create_mqtt_json_ble(String topic, String ident, String fechayhora,
                             const MokoSensorData& data,
-                            String latitud, String longitud, float Vbateria,
+                            String latitud, String longitud, float Vbackup,
                             float Vprincipal, unsigned long numeroPaquete) {
   StaticJsonDocument<2048> doc;
   
@@ -312,21 +314,40 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
   doc["date"] = fechayhora;
   doc["index"] = numeroPaquete;
   
-  if (data.rawHex.length() > 0) doc["rawHex"] = data.rawHex;
+  if (data.frameType != 0x81 && data.rawHex.length() > 0) doc["rawHex"] = data.rawHex;
 
-  if (data.frameType != 0) {
+  if (data.frameType != 0 && data.frameType != 0x81) {
     char ftBuf[5];
     sprintf(ftBuf, "0x%02X", data.frameType);
     doc["frame_type"] = String(ftBuf);
   }
 
+  if (data.frameType != 0x81 && data.manufacturerId != 0) {
+    char mfgBuf[7];
+    sprintf(mfgBuf, "0x%04X", data.manufacturerId);
+    doc["manufacturer_id"] = String(mfgBuf);
+  }
+
   // Common or historically present fields (L02S, PaPeR, H4Pro general)
-  if (data.batteryLevel > 0) doc["% bat"] = data.batteryLevel;
+  if (data.rssi != 0) doc["rssi"] = data.rssi;
+  if (data.frameType == 0x81) {
+    if (data.batteryValid) {
+      doc["% bat"] = data.batteryLevel;
+      if (data.batteryMv > 0) doc["battery_mv"] = data.batteryMv;
+    }
+  } else {
+    if (data.batteryLevel > 0) doc["% bat"] = data.batteryLevel;
+    if (data.batteryMv > 0) doc["battery_mv"] = data.batteryMv;
+  }
   if (data.rangingData != 0) doc["ranging"] = data.rangingData;
   if (data.advInterval > 0) doc["adv_int"] = data.advInterval;
   if (data.deviceType != 0) doc["dev_type"] = data.deviceType;
-  if (data.motion > 0) doc["mov"] = data.motion;
-  if (data.door > 0) doc["door"] = data.door;
+  if (data.hasMotionStatus) doc["mov"] = data.motion;
+  if (data.hasDoorStatus) {
+    doc["door"] = data.door;
+  }
+  if (data.hasDoorOpen) doc["door_open"] = data.doorOpen;
+  if (data.frameType != 0x81 && data.hasPirRaw) doc["pir_raw"] = data.pirRaw;
 
   // Frame-specific conditional additions
   switch (data.frameType) {
@@ -350,6 +371,11 @@ String create_mqtt_json_ble(String topic, String ident, String fechayhora,
     case 0x70:
       doc["temp"] = String(data.temperature, 2);
       doc["hum"] = String(data.humidity, 2);
+      break;
+    case 0x81:
+      doc["ibeacon_uuid"] = data.ibeaconUuid;
+      if (data.hasMotionStatus) doc["pir_motion"] = data.motion == 1;
+      doc["battery_valid"] = data.batteryValid;
       break;
     default:
       // If no specific MOKO frame type is set, it might be an older sensor

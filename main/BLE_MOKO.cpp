@@ -1,10 +1,98 @@
 #include "BLE_MOKO.h"
 #include "Debug.h"
 
+#include "esp_task_wdt.h"
 #include <vector>
 
 static std::vector<MokoSensorData> _tempDataList;
 static bool _foundDevice = false;
+
+static const uint16_t MOKO_DOOR_MANUFACTURER_ID = 0x620A;
+static const size_t MOKO_DOOR_IBEACON_LENGTH = 25;
+
+static String cleanMacAddress(const std::string &macAddress) {
+  String cleanMac = String(macAddress.c_str());
+  cleanMac.replace(":", "");
+  return cleanMac;
+}
+
+static uint16_t readU16BE(const std::string &data, size_t index) {
+  return ((uint16_t)(uint8_t)data[index] << 8) | (uint8_t)data[index + 1];
+}
+
+static int batteryPercentFromMilliVolts(uint16_t battMv) {
+  int battPct = map(battMv, 2000, 3600, 0, 100);
+  return constrain(battPct, 0, 100);
+}
+
+static bool mokoDoorTryParseAdvertisement(
+    const NimBLEAdvertisedDevice *device, MokoSensorData &data) {
+
+  if (!device->haveManufacturerData()) {
+    return false;
+  }
+
+  std::string mfgData = device->getManufacturerData();
+  if (mfgData.length() != MOKO_DOOR_IBEACON_LENGTH) {
+    return false;
+  }
+
+  uint16_t manufacturerId =
+      ((uint16_t)(uint8_t)mfgData[1] << 8) | (uint8_t)mfgData[0];
+  if (manufacturerId != MOKO_DOOR_MANUFACTURER_ID ||
+      (uint8_t)mfgData[2] != 0x02 || (uint8_t)mfgData[3] != 0x15) {
+    return false;
+  }
+
+  uint8_t status = (uint8_t)mfgData[4];
+  uint8_t doorRaw = (status >> 3) & 0x01;
+  uint8_t pirRaw = status & 0x01;
+  uint16_t batteryMv = readU16BE(mfgData, 18);
+
+  data = MokoSensorData();
+  data.valid = true;
+  data.name =
+      device->haveName() ? String(device->getName().c_str()) : "MkiBeacon";
+  data.mac = cleanMacAddress(device->getAddress().toString());
+  data.tag_id = data.mac;
+  data.rssi = device->getRSSI();
+  data.lastUpdate = millis();
+  data.frameType = 0x81;
+  data.uuid = "620A";
+  data.manufacturerId = manufacturerId;
+
+  data.door = doorRaw;
+  data.doorOpen = doorRaw == 1;
+  data.hasDoorStatus = true;
+  data.hasDoorOpen = true;
+
+  data.motion = pirRaw;
+  data.pirRaw = pirRaw;
+  data.hasPirRaw = true;
+  data.pirValid = true;
+  data.hasMotionStatus = true;
+
+  if (batteryMv >= 2000 && batteryMv <= 5000) {
+    data.batteryMv = batteryMv;
+    data.batteryLevel = batteryPercentFromMilliVolts(batteryMv);
+    data.batteryValid = true;
+  }
+
+  data.ibeaconUuid = "";
+  for (int i = 4; i <= 19; i++) {
+    char buf[3];
+    sprintf(buf, "%02X", (uint8_t)mfgData[i]);
+    data.ibeaconUuid += String(buf);
+  }
+  data.major = readU16BE(mfgData, 20);
+  data.minor = readU16BE(mfgData, 22);
+  data.rssi1m = (int8_t)mfgData[24];
+
+  DVL_PRINTF("  MOKO Door -> door_open=%s, pir_motion=%s, battery=%u mV\n",
+             data.doorOpen ? "true" : "false",
+             data.motion == 1 ? "true" : "false", data.batteryMv);
+  return true;
+}
 
 class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override {
@@ -15,11 +103,18 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
     DVL_PRINT(" RSSI: ");
     DVL_PRINTLN(advertisedDevice->getRSSI());
 
+    if (!advertisedDevice->haveName() ||
+        advertisedDevice->getName().find("DVL") == std::string::npos) {
+      return;
+    }
+
     std::string macAddress = advertisedDevice->getAddress().toString();
 
     // ==================== MOKO BEACONX PRO (H4 Pro) ====================
     bool isMoko = false;
     const std::vector<uint8_t> &payload_check = advertisedDevice->getPayload();
+    bool isEa01 = payload_check.size() >= 31 && payload_check[4] == 0x16 &&
+                  payload_check[5] == 0x01 && payload_check[6] == 0xEA;
     for (size_t i = 0; i + 1 < payload_check.size(); i++) {
       if (payload_check[i] == 0x16 && i + 3 < payload_check.size() &&
           payload_check[i + 1] == 0xAB && payload_check[i + 2] == 0xFE) {
@@ -122,6 +217,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       h4Data.accelZ = 0;
       h4Data.motion = 0;
       h4Data.door = 0;
+      h4Data.hasMotionStatus = false;
+      h4Data.hasDoorStatus = false;
       h4Data.tag_id = "";
       h4Data.uuid = "";
       h4Data.temperature = 0;
@@ -167,6 +264,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 uint16_t battMv = ((uint16_t)payload[frameStart + 3] << 8) | payload[frameStart + 4];
                 int battPct = constrain(map(battMv, 2000, 3600, 0, 100), 0, 100);
                 h4Data.batteryLevel = battPct;
+                h4Data.batteryMv = battMv;
                 
                 h4Data.deviceProperty = payload[frameStart + 5];
                 h4Data.switchStatus = payload[frameStart + 6];
@@ -233,6 +331,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 uint16_t battMv = ((uint16_t)payload[frameStart + 12] << 8) | payload[frameStart + 13];
                 int battPct = constrain(map(battMv, 2000, 3600, 0, 100), 0, 100);
                 h4Data.batteryLevel = battPct;
+                h4Data.batteryMv = battMv;
 
                 h4Data.tag_id = "";
                 for (int j = 15; j <= 20; j++) { // RFU byte skipped
@@ -268,6 +367,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                 uint16_t battMv = ((uint16_t)payload[frameStart + 7] << 8) | payload[frameStart + 8];
                 int battPct = constrain(map(battMv, 2000, 3600, 0, 100), 0, 100);
                 h4Data.batteryLevel = battPct;
+                h4Data.batteryMv = battMv;
 
                 // Ranging data (Tx Power at 0m, signed int8, index 11 -> frameStart + 1)
                 h4Data.rangingData = (int8_t)payload[frameStart + 1];
@@ -319,17 +419,21 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       _tempDataList.push_back(h4Data);
       _foundDevice = true;
       DVL_PRINTLN("================================================");
+      return;
     }
     // ==================== END H4 PRO ====================
 
-    // Check for "PaPeR" in the advertised name
-    bool isTarget = false;
-    if (advertisedDevice->haveName() && advertisedDevice->getName().find("PaPeR") != std::string::npos) {
-        isTarget = true;
+    // ==================== MOKO Door/PIR advertising ====================
+    MokoSensorData doorData;
+    if (mokoDoorTryParseAdvertisement(advertisedDevice, doorData)) {
+      _tempDataList.push_back(doorData);
+      _foundDevice = true;
+      return;
     }
+    // ==================== END MOKO Door/PIR advertising ====================
 
-    if (isTarget) {
-      DVL_PRINTLN(">>> TARGET DEVICE FOUND (PaPeR) <<<");
+    if (isEa01) {
+      DVL_PRINTLN(">>> TARGET DEVICE FOUND (DVL/EA01) <<<");
       DVL_PRINT("MAC: ");
       DVL_PRINTLN(macAddress.c_str());
       DVL_PRINT("RSSI: ");
@@ -370,8 +474,8 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
       const std::vector<uint8_t> &payloadVector =
           advertisedDevice->getPayload();
 
-      // PARSEO ESPECIFICO PARA MOKO L02S / PaPeR (Service Data 0xEA01)
-      if (payloadVector.size() >= 28) {
+      // PARSEO ESPECIFICO PARA MOKO L02S (Service Data 0xEA01)
+      if (payloadVector.size() >= 31) {
         MokoSensorData _tempData;
 
         int16_t tempRaw =
@@ -391,6 +495,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         uint8_t statusByte = payloadVector[8];
         _tempData.motion = (statusByte >> 1) & 0x01;
         _tempData.door = (statusByte >> 0) & 0x01;
+        _tempData.hasMotionStatus = true;
 
         _tempData.accelX =
             (int16_t)((payloadVector[13] << 8) | payloadVector[14]);
@@ -409,7 +514,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
         _tempData.uuid = "EA01";
 
-        DVL_PRINTF("[PaPeR] Parsed -> Temp: %.2f C, Hum: %.2f %%, Bat: "
+        DVL_PRINTF("[DVL/EA01] Parsed -> Temp: %.2f C, Hum: %.2f %%, Bat: "
                       "%d%%, D: %d, M: %d, X: %.0f, Y: %.0f, Z: %.0f\n",
                       _tempData.temperature, _tempData.humidity, battPct,
                       _tempData.door, _tempData.motion, _tempData.accelX,
@@ -425,7 +530,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
 
         _tempData.valid = true;
-        _tempData.name = "PaPeR";
+        _tempData.name = advertisedDevice->getName().c_str();
         String cleanMac = macAddress.c_str();
         cleanMac.replace(":", "");
         _tempData.mac = cleanMac;
@@ -434,14 +539,15 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
 
         _tempDataList.push_back(_tempData);
         _foundDevice = true;
+        return;
       }
 
       DVL_PRINTLN("------------------------------------------------");
     }
 
-    if (advertisedDevice->haveName() &&
-        advertisedDevice->getName().rfind("L02", 0) == 0) {
-      DVL_PRINT("BLE: L02S device found! Name: ");
+    if (advertisedDevice->haveManufacturerData() &&
+        advertisedDevice->getManufacturerData().length() == 7) {
+      DVL_PRINT("BLE: DVL L02 device found! Name: ");
       DVL_PRINTLN(advertisedDevice->getName().c_str());
       DVL_PRINT("RSSI: ");
       DVL_PRINTLN(advertisedDevice->getRSSI());
@@ -534,9 +640,7 @@ void BLEMokoScanner::loop() {
         // If start returns true (async started), we wait
         while (pBLEScan->isScanning()) {
           delay(100);
-#ifdef ESP_TASK_WDT_len
           esp_task_wdt_reset();
-#endif
         }
       } else {
         DVL_PRINTLN("Fallo al iniciar pBLEScan->start()");

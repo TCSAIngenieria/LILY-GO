@@ -29,6 +29,7 @@
 #include "MQTT.h"
 #include "Modbus.h"
 #include "SerialSecundario.h"
+#include "TensionAlimentacion.h"
 #include "WebServerConfig.h"
 #include "BridgeAP.h"
 
@@ -51,7 +52,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.01.06";
+String versionado = "V07.17.00";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -160,11 +161,11 @@ const unsigned long Packets_read_Interval = 2000;
 unsigned long last_flash_read = 0;
 
 /*Variables para ADC*/
-float ADCValue[3];
-float filterADC[3][2] = {{0, 0}, {0, 0}, {0, 0}};
-float ADCValueAnt[3] = {0, 0, 0};
+float ADCValue[2];
+float filterADC[2][2] = {{0, 0}, {0, 0}};
+float ADCValueAnt[2] = {0, 0};
 int cantMed = 50;
-float paramADC[3][2] = {{1, 0}, {1, 0}, {1, 0}};
+float paramADC[2][2] = {{1, 0}, {1, 0}};
 uint16_t tADC = 1;
 uint16_t cADC = 0;
 
@@ -224,6 +225,10 @@ void setup() {
   en_wifi = preferences.getUInt("wifi", 1);
   preferences.end();
 
+  if (en_serial > 2) {
+    en_serial = 0;
+  }
+
   // --- Contador de reinicios y Lectura de AP Mode ---
   preferences.begin("device", false);
   bool forceAP = preferences.getBool("forceAP", false);
@@ -242,6 +247,8 @@ void setup() {
   // password = preferences.getString("password", "Ayanami84");
   ssid = preferences.getString("ssid", "Invitados");
   password = preferences.getString("password", "TCinvitados");
+  // ssid = preferences.getString("ssid", "TCSA");
+  // password = preferences.getString("password", "ccreto3236TAM");
   preferences.end();
   if (forceAP) {
     Serial.println("\n===============================================");
@@ -318,6 +325,7 @@ void setup() {
 
   flash_init();
   initADC();
+  initTensionAlimentacion();
 
   // Inicializacion del sensor
   sensor->begin();
@@ -341,7 +349,8 @@ void setup() {
   /*CONFIGURACIoN WEB SERVER ADMIN*/
   preferences.begin("mqtt", true);
   MQTT_BROKER = preferences.getString(
-      "ip", "iot.tcsa.com.ar"); // ← solo usa este si no hay guardado
+      // "ip", "192.168.7.24"); // ← solo usa este si no hay guardado
+      "ip", "iot.tcsa.com.ar");
   MQTT_PORT = preferences.getInt("port", 1883); // ← idem
   preferences.end();
 
@@ -599,36 +608,15 @@ void loop() {
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
-        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
+        // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
   topicBLE.toUpperCase();
-        switch (bleData.frameType) {
-        case 0x40:
-          topicBLE += "/Device_Info";
-          break;
-        case 0x50:
-          topicBLE += "/iBeacon";
-          break;
-        case 0x60:
-          topicBLE += "/3-axis_Acc";
-          break;
-        case 0x70:
-          topicBLE += "/T_and_H";
-          break;
-        default:
-          if (bleData.frameType != 0) {
-            char ftBuf[10];
-            sprintf(ftBuf, "/0x%02X", bleData.frameType);
-            topicBLE += String(ftBuf);
-          }
-          break;
-        }
 
         unsigned long numPkt = obtener_y_avanzar_numero_paquete();
 
         String jsonBLE = create_mqtt_json_ble(
             topicBLE, ident, printCurrentTime(), bleData, ultimaLat, ultimaLon,
-            leer_tension_bateria(), leer_tension_principal(), numPkt);
+            leer_tension_backup(), leer_tension_principal(), numPkt);
 
         if (mqtt.connected()) {
           if (publish_mqtt_json(topicBLE, jsonBLE)) {
@@ -720,7 +708,7 @@ void loop() {
 
         String jsonsensor = create_mqtt_json_sensor(
             topicSensor, ident, valorStr, printCurrentTime(),
-            leer_tension_bateria(), leer_tension_principal(), numPkt);
+            leer_tension_backup(), leer_tension_principal(), numPkt);
 
         if (mqtt.connected()) {
 
@@ -758,7 +746,7 @@ void loop() {
           sensorValues[7], sensorValues[8], sensorValues[9], sensorValues[10],
           sensorValues[11], sensorValues[12], sensorValues[13],
           sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat,
-          ultimaLon, leer_tension_bateria(), leer_tension_principal(), numPkt);
+          ultimaLon, leer_tension_backup(), leer_tension_principal(), numPkt);
 
       if (mqtt.connected()) {
 
@@ -787,7 +775,7 @@ void loop() {
   topicModbus.toUpperCase();
       String jsonmodbus = create_mqtt_json_modbus(
           topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
-          leer_tension_bateria(), leer_tension_principal(), numPkt);
+          leer_tension_backup(), leer_tension_principal(), numPkt);
 
       if (mqtt.connected()) {
         if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
@@ -802,63 +790,12 @@ void loop() {
       }
     }
 
-    if (en_ble == 1) {
-      // Logic for BLE MQTT Report
-      if (bleScanner.hasNewData()) {
-        std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
-
-        for (const auto &data : bleDataList) {
-          unsigned long numPkt = obtener_y_avanzar_numero_paquete();
-
-          DVL_PRINT("BLE Data found. Temp: ");
-          DVL_PRINT(data.temperature);
-          DVL_PRINTLN(" Sending MQTT...");
-
-          // Topic: DVL/LILY-GO/<ident>/BLE/<MAC>[/<frameType>]
-          String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + data.mac;
-          switch (data.frameType) {
-          case 0x40:
-            topicBLE += "/Device_Info";
-            break;
-          case 0x50:
-            topicBLE += "/iBeacon";
-            break;
-          case 0x60:
-            topicBLE += "/3-axis_Acc";
-            break;
-          case 0x70:
-            topicBLE += "/T_and_H";
-            break;
-          default:
-            if (data.frameType != 0) {
-              char ftBuf[10];
-              sprintf(ftBuf, "/0x%02X", data.frameType);
-              topicBLE += String(ftBuf);
-            }
-            break;
-          }
-
-          String jsonble = create_mqtt_json_ble(
-              topicBLE, ident, printCurrentTime(), data, ultimaLat, ultimaLon,
-              leer_tension_bateria(), leer_tension_principal(), numPkt);
-
-          if (mqtt.connected()) {
-            if (publish_mqtt_json(topicBLE, jsonble)) {
-              mqttUltimaConexionOK = millis();
-            }
-          } else {
-            flash_save_packet(jsonble.c_str());
-          }
-        }
-      }
-    }
-
     if (en_adc == 1) {
       DVL_PRINT("ADC habilitado. Enviando reporte ADC...");
       String topicADC = topic1 + "/ADC";
   topicADC.toUpperCase();
       String jsonadc = create_mqtt_json_adc(
-          topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1], ADCValue[2]);
+          topicADC, ident, printCurrentTime(), ADCValue[0], ADCValue[1]);
 
       if (mqtt.connected()) {
         if (publish_mqtt_json(topicADC, jsonadc)) {
@@ -907,7 +844,7 @@ void loop() {
     String jsonKeepAlive = create_mqtt_json_keepalive(
         topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
         rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
-        rsrp, rssi);
+        rsrp, rssi, leer_tension_backup(), leer_tension_principal());
     if (mqtt.connected()) {
       publish_mqtt_json(topic1, jsonKeepAlive);
     }

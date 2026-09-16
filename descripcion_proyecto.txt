@@ -26,7 +26,7 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
 
 #### Sensores e Interfaces
 - **ADC (Analógico):**
-  - Lectura de 3 canales analógicos.
+  - Lectura de 2 canales analógicos: GPIO34 y GPIO39.
   - Configuración de filtros (umbral mínimo), factores de calibración (pendiente/offset) y alisado (promedio móvil).
 - **Modbus RTU (RS485):**
   - Maestro Modbus para interrogar dispositivos esclavos industriales.

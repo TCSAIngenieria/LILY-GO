@@ -22,8 +22,8 @@ String sensorValues[16]; // S0...S15
 
 extern HardwareSerial SensorSerial;
 extern HardwareSerial SensorSerial;
-extern float filterADC[3][2];
-extern float paramADC[3][2];
+extern float filterADC[2][2];
+extern float paramADC[2][2];
 extern int cantMed;
 extern uint16_t tADC;
 
@@ -67,7 +67,7 @@ String procesarComando(String comando) {
       float m = args.substring(firstComma + 1, secondComma).toFloat();
       float p = args.substring(secondComma + 1).toFloat();
 
-      if (n >= 0 && n < 3) {
+      if (n >= 0 && n < 2) {
         filterADC[n][0] = m;
         filterADC[n][1] = p;
 
@@ -80,7 +80,7 @@ String procesarComando(String comando) {
 
         respuesta = "FILTRO SETEADO OK";
       } else {
-        respuesta = "ERROR: Indice fuera de rango (0-2)";
+        respuesta = "ERROR: Indice fuera de rango (0-1)";
       }
     } else {
       respuesta = "ERROR: Formato incorrecto (n,m,p)";
@@ -98,7 +98,7 @@ String procesarComando(String comando) {
       float m = args.substring(firstComma + 1, secondComma).toFloat();
       float p = args.substring(secondComma + 1).toFloat();
 
-      if (n >= 0 && n < 3) {
+      if (n >= 0 && n < 2) {
         paramADC[n][0] = m;
         paramADC[n][1] = p;
 
@@ -111,7 +111,7 @@ String procesarComando(String comando) {
 
         respuesta = "FACTOR SETEADO OK";
       } else {
-        respuesta = "ERROR: Indice fuera de rango (0-2)";
+        respuesta = "ERROR: Indice fuera de rango (0-1)";
       }
     } else {
       respuesta = "ERROR: Formato incorrecto (n,m,p)";
@@ -246,20 +246,24 @@ String procesarComando(String comando) {
     String v = comando.substring(String("DVL+EN_SERIAL=").length());
     v.trim();
     int val = v.toInt();
-    if (val == 1) {
-      en_serial = 1;
-    } else if (val == 2) {
-      en_serial = 2;
+    if (val == 1 || val == 2) {
+      en_serial = val;
     } else {
       en_serial = 0;
     }
     preferences.begin("enables", false);
     preferences.putUInt("serial", en_serial);
+    if (en_serial != 0) {
+      en_modbus = 0;
+      preferences.putUInt("modbus", 0);
+      modbus_set_enabled(false);
+    }
     preferences.end();
     if (en_serial == 1) {
-      respuesta = ">> HABILITADO LECTURA SERIAL";
+      respuesta = ">> HABILITADO LECTURA SERIAL (EN_MODBUS=0)";
     } else if (en_serial == 2) {
-      respuesta = ">> HABILITADO SERIAL BRIDGE / RETRANSMISION";
+      respuesta =
+          ">> HABILITADO SERIAL BRIDGE / RETRANSMISION (EN_MODBUS=0)";
     } else {
       respuesta = ">> DESHABILITADO LECTURA SERIAL";
     }
@@ -463,14 +467,12 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+QFIL") {
     respuesta =
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
-        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]) +
-        " | FIL2=" + String(filterADC[2][0]) + "," + String(filterADC[2][1]);
+        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]);
 
   } else if (comando == "DVL+QFACTOR") {
     respuesta =
         "FAC0=" + String(paramADC[0][0]) + "," + String(paramADC[0][1]) +
-        " | FAC1=" + String(paramADC[1][0]) + "," + String(paramADC[1][1]) +
-        " | FAC2=" + String(paramADC[2][0]) + "," + String(paramADC[2][1]);
+        " | FAC1=" + String(paramADC[1][0]) + "," + String(paramADC[1][1]);
 
   } else if (comando.startsWith("DVL+SALI=")) {
     int val = comando.substring(9).toInt();
@@ -546,8 +548,7 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+QFIL") {
     respuesta =
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
-        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]) +
-        " | FIL2=" + String(filterADC[2][0]) + "," + String(filterADC[2][1]);
+        " | FIL1=" + String(filterADC[1][0]) + "," + String(filterADC[1][1]);
 
   } else if (comando == "DVL+QEN_SERIAL") {
     preferences.begin("enables", true);

@@ -18,9 +18,12 @@ struct MokoSensorData {
   float temperature = 0.0;
   float humidity = 0.0;
   int batteryLevel = 0;
+  uint16_t batteryMv = 0;
+  bool batteryValid = false;
   int rangingData = 0;
   int advInterval = 0;
   int deviceType = 0;
+  uint16_t manufacturerId = 0;
   uint8_t frameType = 0;
   uint8_t deviceProperty = 0;
   uint8_t switchStatus = 0;
@@ -38,6 +41,13 @@ struct MokoSensorData {
   String rawHex = "";
   uint8_t motion = 0;
   uint8_t door = 0;
+  bool doorOpen = false;
+  bool hasDoorOpen = false;
+  uint8_t pirRaw = 0;
+  bool hasPirRaw = false;
+  bool pirValid = false;
+  bool hasMotionStatus = false;
+  bool hasDoorStatus = false;
   String tag_id = "";
   String uuid = "";
   unsigned long lastUpdate = 0;
