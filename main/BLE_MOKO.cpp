@@ -104,8 +104,9 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
     DVL_PRINTLN(advertisedDevice->getRSSI());
 
     if (!advertisedDevice->haveName() ||
-        advertisedDevice->getName().find("DVL") == std::string::npos) {
-      return;
+    (advertisedDevice->getName().find("DVL") == std::string::npos &&
+     advertisedDevice->getName().find("PaPeR") == std::string::npos)) {
+    return;
     }
 
     std::string macAddress = advertisedDevice->getAddress().toString();
