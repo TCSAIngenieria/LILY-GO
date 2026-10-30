@@ -4,6 +4,9 @@
 #include "FOTA.h"
 #include "Flash.h"
 #include "GNSS.h" // Para setLatitude, setLongitude, setLocationValid
+#include "GPRS.h"
+
+extern TinyGsm modem;
 #include "Modbus.h"
 #include <Preferences.h>
 #include "MQTT.h"
@@ -335,9 +338,56 @@ String procesarComando(String comando) {
     preferences.putUInt("modem", en_modem);
     preferences.end();
     if (en_modem == 1) {
+      asegurarModemEncendido();
+      forceModemTechReconfig();
+      if (en_wifi != 1 || WiFi.status() != WL_CONNECTED) {
+        TINY_GSM_USE_WIFI = false;
+        TINY_GSM_USE_GPRS = true;
+      }
       respuesta = ">> HABILITADO MODEM";
     } else {
+      TINY_GSM_USE_WIFI = true;
+      TINY_GSM_USE_GPRS = false;
       respuesta = ">> DESHABILITADO MODEM";
+    }
+  }
+
+  /*comando para nivel de verborragia/debug del modem (0=Normal, 1=Detallado, 2=Detallado+Raw AT)*/
+  else if (comando.startsWith("DVL+DBG_MODEM=")) {
+    String v = comando.substring(String("DVL+DBG_MODEM=").length());
+    v.trim();
+    int lvl = v.toInt();
+    if (lvl >= 0 && lvl <= 2) {
+      modemDebugLevel = (uint8_t)lvl;
+      preferences.begin("enables", false);
+      preferences.putUInt("modem_dbg", modemDebugLevel);
+      preferences.end();
+      if (modemDebugLevel == 0) {
+        respuesta = ">> DBG_MODEM=0 (MODO NORMAL / RESUMIDO)";
+      } else if (modemDebugLevel == 1) {
+        respuesta = ">> DBG_MODEM=1 (DIAGNOSTICO DETALLADO DE ESTADOS Y SENAL)";
+      } else {
+        respuesta = ">> DBG_MODEM=2 (VERBORRAGICO TOTAL + TRAZA COMANDOS AT CRUDOS)";
+      }
+    } else {
+      respuesta = "[ERR] Valor invalido. Use DVL+DBG_MODEM=0, 1 o 2";
+    }
+  }
+
+  /*comando para seleccionar modo de tecnologia celular (0=Auto, 1=CAT-M1, 2=NB-IoT, 3=2G)*/
+  else if (comando.startsWith("DVL+MODEM_TECH=")) {
+    String v = comando.substring(String("DVL+MODEM_TECH=").length());
+    v.trim();
+    int tech = v.toInt();
+    if (tech >= 0 && tech <= 3) {
+      modemTechMode = (uint8_t)tech;
+      preferences.begin("enables", false);
+      preferences.putUInt("modem_tech", modemTechMode);
+      preferences.end();
+      forceModemTechReconfig();
+      respuesta = ">> MODEM_TECH=" + String(modemTechMode) + " (" + getModemTechModeName(modemTechMode) + ")";
+    } else {
+      respuesta = "[ERR] Valor invalido. Use DVL+MODEM_TECH=0 (Auto), 1 (CAT-M1), 2 (NB-IoT) o 3 (2G)";
     }
   }
 
@@ -576,6 +626,21 @@ String procesarComando(String comando) {
     en_modem = preferences.getUInt("modem", 1);
     preferences.end();
     respuesta = "EN_MODEM=" + String(en_modem);
+
+  } else if (comando == "DVL+QDBG_MODEM") {
+    preferences.begin("enables", true);
+    modemDebugLevel = (uint8_t)preferences.getUInt("modem_dbg", 0);
+    preferences.end();
+    respuesta = "DBG_MODEM=" + String(modemDebugLevel);
+
+  } else if (comando == "DVL+QMODEM_TECH") {
+    preferences.begin("enables", true);
+    modemTechMode = (uint8_t)preferences.getUInt("modem_tech", 0);
+    preferences.end();
+    respuesta = "MODEM_TECH=" + String(modemTechMode) + " (" + getModemTechModeName(modemTechMode) + ") | ACTIVA=" + getGSMTech();
+
+  } else if (comando == "DVL+MODEM_STATUS") {
+    respuesta = getModemDetailedStatus(modem);
 
   } else if (comando == "DVL+QEN_GPS") {
     preferences.begin("enables", true);

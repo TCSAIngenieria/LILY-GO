@@ -152,11 +152,13 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
     return false;
   }
 
-  // Si el cliente está conectado, actualizamos el temporizador de actividad de red
-  // para evitar reinicios por falsos fallos causados por retardos del módem (TinyGSM).
-  mqttUltimaConexionOK = millis();
-
   bool sent = mqtt.publish(topic.c_str(), jsonPayload.c_str());
+  if (sent) {
+    mqttUltimaConexionOK = millis();
+  } else {
+    mqtt.disconnect();
+  }
+
   DVL_PRINT("Publicado JSON en topic ");
   DVL_PRINT(topic);
   DVL_PRINT(": ");
