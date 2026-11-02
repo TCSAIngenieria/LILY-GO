@@ -1,5 +1,6 @@
 #include "ADC.h"
 #include "Debug.h"
+#include "esp_adc_cal.h"
 #include <Preferences.h>
 
 #define ADC_PIN_34 34  // Pin ADC
@@ -9,16 +10,25 @@
 // #define ADC1_CH4 32     // Pin ADC1_CH4
 // #define ADC1_CH5 33     // Pin ADC1_CH5
 
+esp_adc_cal_characteristics_t adc_chars;
+
 extern float filterADC[2][2];
 extern float ADCValueAnt[2];
 extern int cantMed;
 extern float paramADC[2][2];
 
-// Conversor de ADC a Voltaje
+// Conversor de ADC a Voltaje calibrado por Vref (eFuse)
 float readVoltage(int pin) {
-  int adcValue = analogRead(pin);
-  float voltage = (adcValue / 4095.0) * 3.3;
-  return voltage;
+  uint32_t sum = 0;
+
+  for (int i = 0; i < 64; i++) {
+    sum += analogRead(pin);
+  }
+
+  uint32_t raw = sum / 64;
+  uint32_t mv = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+
+  return mv / 1000.0f;
 }
 
 // Inicializacion del ADC para lectura de voltaje
@@ -26,6 +36,14 @@ void initADC() {
   analogReadResolution(12);
   analogSetPinAttenuation(ADC_PIN_34, ADC_11db);
   analogSetPinAttenuation(ADC_PIN_39, ADC_11db);
+
+  esp_adc_cal_characterize(
+      ADC_UNIT_1,
+      ADC_ATTEN_DB_11,
+      ADC_WIDTH_BIT_12,
+      1100,               // Vref nominal
+      &adc_chars
+  );
 
   Preferences preferences;
 
