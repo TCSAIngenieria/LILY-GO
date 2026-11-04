@@ -95,6 +95,12 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
   }
 
   bool sent = mqtt.publish(topic.c_str(), jsonPayload.c_str());
+  if (sent) {
+    mqttUltimaConexionOK = millis();
+  } else {
+    mqtt.disconnect();
+  }
+
   DVL_PRINT("Publicado JSON en topic ");
   DVL_PRINT(topic);
   DVL_PRINT(": ");
@@ -105,27 +111,30 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
 }
 
 String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
-                            float adc1, float adc2) {
+                            float adc1) {
   StaticJsonDocument<256> doc;
   doc["ident"] = ident;
   doc["status"] = "adc-values";
   doc["date"] = fechayhora;
   doc["adc0"] = adc0;
   doc["adc1"] = adc1;
-  doc["adc2"] = adc2;
  
   return finalizeJson(doc);
 }
 
 String create_mqtt_json_pivot(String ident, String fechayhora, int di1,
-                              int di2, int sirena, int pivot_enabled, unsigned long index) {
-  StaticJsonDocument<256> doc;
+                              int di2, int sirena, int pivot_enabled,
+                              float Vbackup, float Vprincipal,
+                              unsigned long index) {
+  StaticJsonDocument<384> doc;
   doc["Ident"] = ident;
   doc["Date"] = fechayhora;
   doc["DI1"] = di1;
   doc["DI2"] = di2;
   doc["Sirena"] = sirena;
   doc["PivotEnabled"] = pivot_enabled;
+  doc["Tension_backup"] = Vbackup;
+  doc["Tension_principal"] = Vprincipal;
   doc["index"] = index;
   
   return finalizeJson(doc);
@@ -136,13 +145,16 @@ String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String versionado, unsigned long rebootCount,
                                   String connType, String connDetail,
                                   String imei, String imsi, String iccid,
-                                  String rsrq, String rsrp, String rssi) {
-  StaticJsonDocument<512> doc;
+                                  String rsrq, String rsrp, String rssi,
+                                  float Vbackup, float Vprincipal) {
+  StaticJsonDocument<768> doc;
   doc["ident"] = ident;
   doc["status"] = "keep-alive";
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
+  doc["Tension_principal"] = Vprincipal;
+  doc["Tension_backup"] = Vbackup;
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
   doc["conn_type"] = connType;

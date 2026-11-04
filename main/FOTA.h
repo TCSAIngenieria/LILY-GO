@@ -10,5 +10,6 @@ public:
 };
 
 extern FOTAClass FOTA;
+bool parsearURL(String url, String &protocol, String &host, int &port, String &path);
 
 #endif

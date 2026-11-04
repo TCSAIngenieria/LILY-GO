@@ -11,6 +11,7 @@ Preferences prefs;
 // Variables globales
 String ultimaLat = "-33.123456";
 String ultimaLon = "-64.123456";
+String apn = "igprs.claro.com.ar";
 extern String ident;
 
 String spublishInterval;
@@ -29,6 +30,7 @@ void lectura_flash() {
   ultimaLat = leer_de_flash("lat");
   ultimaLon = leer_de_flash("lon");
   spublishInterval = leer_de_flash("time");
+  apn = leer_de_flash("apn", "igprs.claro.com.ar");
   if (spublishInterval != "N/A" && spublishInterval.length() > 0) {
     unsigned long temp = strtoul(spublishInterval.c_str(), NULL, 10);
     if (temp > 0) {
@@ -40,6 +42,8 @@ void lectura_flash() {
   DVL_PRINTLN(ultimaLat);
   DVL_PRINT("ultima Longitud guardada: ");
   DVL_PRINTLN(ultimaLon);
+  DVL_PRINT("ultimo APN guardado: ");
+  DVL_PRINTLN(apn);
   DVL_PRINT("ultima ultimo publish_time guardado: ");
   DVL_PRINTLN(spublishInterval);
   DVL_PRINT(publishInterval);
@@ -96,6 +100,13 @@ bool flash_buffer_empty() {
 }
 
 bool flash_save_packet(const char* json) {
+  size_t len = strlen(json);
+  if (len >= MAX_PACKET_SIZE) {
+    DVL_PRINTF("Paquete demasiado grande para guardar (%u bytes)\n",
+               (unsigned int)len);
+    return false;
+  }
+
   if (flash_buffer_full()) {
     // Si esta lleno, adelanta readIndex para "pisar" el paquete mas viejo
     readIndex = (readIndex + 1) % MAX_PACKETS;
@@ -111,7 +122,7 @@ bool flash_save_packet(const char* json) {
     DVL_PRINTLN("Error al abrir archivo para guardar paquete");
     return false;
   }
-  f.write((const uint8_t*)json, strlen(json));
+  f.write((const uint8_t*)json, len);
   f.close();
 
   writeIndex = (writeIndex + 1) % MAX_PACKETS;
@@ -142,8 +153,16 @@ const char* flash_get_next_packet() {
   }
   size_t len = f.size();
   if (len >= MAX_PACKET_SIZE) {
-    DVL_PRINTLN("Paquete demasiado grande");
     f.close();
+    DVL_PRINTF("Paquete demasiado grande (%u bytes), descartado index=%d\n",
+               (unsigned int)len, readIndex);
+    SPIFFS.remove(filename);
+    readIndex = (readIndex + 1) % MAX_PACKETS;
+    packetLoaded = false;
+    if (prefs.begin("flash_buf", false)) {
+      prefs.putInt("ridx", readIndex);
+      prefs.end();
+    }
     return nullptr;
   }
   f.readBytes(currentPacket, len);

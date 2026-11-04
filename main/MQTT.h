@@ -15,16 +15,19 @@ void mqttCallback(char *topic, byte *payload, unsigned int len);
 bool publish_mqtt_json(String topic, String jsonPayload);
 
 String create_mqtt_json_adc(String ident, String fechayhora, float adc0,
-                            float adc1, float adc2);
+                            float adc1);
 
 String create_mqtt_json_pivot(String ident, String fechayhora, int di1,
-                              int di2, int sirena, int pivot_enabled, unsigned long index);
+                              int di2, int sirena, int pivot_enabled,
+                              float Vbackup, float Vprincipal,
+                              unsigned long index);
 
 String create_mqtt_json_keepalive(String ident, String fechayhora,
                                   String latitud, String longitud,
                                   String versionado, unsigned long rebootCount,
                                   String connType, String connDetail,
                                   String imei, String imsi, String iccid,
-                                  String rsrq, String rsrp, String rssi);
+                                  String rsrq, String rsrp, String rssi,
+                                  float Vbackup, float Vprincipal);
 
 #endif
