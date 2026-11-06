@@ -52,7 +52,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.18.01";
+String versionado = "V07.18.05";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -107,22 +107,14 @@ bool TINY_GSM_USE_WIFI = false; // uso del wifi
 // Control de fases
 bool faseGPS = true;           // Empezamos buscando latitud/longitud
 bool faseGPRS_WIFI = false;    // Activamos GPRS luego del GPS
-bool relojActualizado = false; // Indica si ya se actualizo el reloj desde NTP
 
 /*Tiempo de busqueda de latitud y longitud de GPS al inicio*/
 unsigned long tiempoInicioGPS = 0;
 const unsigned long tiempoLimiteGPS = 1UL * 60UL * 1000UL; // 1 minuto
 
-///*Tiempo de actualizacion de Hora*/
-unsigned long ultimaActualizacionNTP = 0;
-const unsigned long intervaloNTP = 8UL * 60UL * 60UL * 1000UL; // 8 horas
-
-/* Temporizadores para intentos de GPRS y NTP */
+/* Temporizador para intentos de GPRS */
 unsigned long lastGprsConnectAttempt = 0;
 const unsigned long gprsConnectInterval = 10000; // 10 segundos
-
-unsigned long lastNtpSyncAttempt = 0;
-const unsigned long ntpSyncInterval = 10000; // 10 segundos
 
 /*Variables para reinicio de modem si no se inicia bien*/
 int contadorErroresModem = 0;
@@ -446,6 +438,8 @@ void loop() {
         DVL_PRINTLN("[GPS] Entrando a fase GPS bloqueante...");
         enableGPS();
         float lat, lon;
+        int gpsYear = 0, gpsMonth = 0, gpsDay = 0;
+        int gpsHour = 0, gpsMinute = 0, gpsSecond = 0;
         unsigned long tiempoInicioBloqueo = millis();
         bool fix_conseguido = false;
 
@@ -453,8 +447,12 @@ void loop() {
                millis() - tiempoInicioBloqueo < tiempoLimiteGPS) {
 
           esp_task_wdt_reset();
-          if (modem.getGPS(&lat, &lon)) {
+          if (modem.getGPS(&lat, &lon, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, &gpsYear, &gpsMonth, &gpsDay,
+                           &gpsHour, &gpsMinute, &gpsSecond)) {
             fix_conseguido = true;
+            setClockFromGpsUtc(gpsYear, gpsMonth, gpsDay,
+                               gpsHour, gpsMinute, gpsSecond);
             String nuevaLat = String(lat, 6);
             String nuevaLon = String(lon, 6);
             setLocationValid(true);
@@ -607,27 +605,12 @@ void loop() {
           }
         }
       }
-
-      if (isModemConnected && isGprsActive) {
-
-        if (!relojActualizado) {
-          if (millis() - lastNtpSyncAttempt >= ntpSyncInterval) {
-            lastNtpSyncAttempt = millis();
-            if (updateClockFromNTP(modem)) {
-
-              relojActualizado = true;
-              ultimaActualizacionNTP = millis();
-            } else {
-              DVL_PRINTLN("Fallo la actualizacion de NTP");
-            }
-          }
-        } else if (millis() - ultimaActualizacionNTP >= intervaloNTP) {
-          if (updateClockFromNTP(modem)) {
-            ultimaActualizacionNTP = millis();
-          }
-        }
-      }
     }
+  }
+
+  // Atiende avisos de hora aun cuando NTP falla o no hay sesion de datos.
+  if (en_modem && TINY_GSM_USE_GPRS) {
+    serviceClockFromModem(modem, isModemConnected && isGprsActive);
   }
 
   bool hasNetwork = (TINY_GSM_USE_WIFI && WiFi.status() == WL_CONNECTED) ||

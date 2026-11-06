@@ -31,7 +31,7 @@ extern bool isModemReady;
 extern bool isModemConnected;
 extern bool isGprsActive;
 
-// Interceptor de Stream para visualizar comandos AT crudos en tiempo real cuando modemDebugLevel == 2
+// Interceptor de Stream: captura avisos de hora y muestra AT crudo solo en debug 2.
 class ModemDebugStream : public Stream {
 public:
   ModemDebugStream(Stream &s) : _stream(s) {}
@@ -59,8 +59,8 @@ void iniciarSerialModem();
 void initSD();
 void printModemInfo(TinyGsm &modem, String &res);
 void updateNetworkConnection(TinyGsm &modem);
-bool updateClockFromNTP(TinyGsm &modem);
-void updateInternalClock(String clockString);
+void serviceClockFromModem(TinyGsm &modem, bool dataConnected);
+bool setClockFromGpsUtc(int year, int month, int day, int hour, int minute, int second);
 String printCurrentTime();
 String getGSMTech();
 void getModemSignalInfo(TinyGsm &modem, String &rsrq, String &rsrp, String &rssi);

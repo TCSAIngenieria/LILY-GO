@@ -1,5 +1,6 @@
 #include "GPRS.h"
 #include "Debug.h"
+#include "ClockSync.h"
 #include <PubSubClient.h>
 #include <time.h>
 #include <sys/time.h>
@@ -37,8 +38,6 @@ const unsigned long modeWindowTimeout = 45000;  // 45 segundos de espera por tec
 int currentModeIndex = 0;
 static String activeTechDetected = "";
 
-static time_t internalTime = 0;
-
 // ==================== Implementacion de ModemDebugStream ====================
 
 int ModemDebugStream::available() {
@@ -47,11 +46,16 @@ int ModemDebugStream::available() {
 
 int ModemDebugStream::read() {
   int c = _stream.read();
-  if (c >= 0 && modemDebugLevel >= 2) {
+  if (c >= 0) {
     if (c == '\n') {
       _rxLine.trim();
       if (_rxLine.length() > 0) {
-        DVL_PRINTF("[AT << %lu ms] %s\n", millis(), _rxLine.c_str());
+        if (_rxLine.startsWith("*PSUTTZ:") || _rxLine.startsWith("+CNTP:")) {
+          clockTimeNotice(_rxLine);
+        }
+        if (modemDebugLevel >= 2) {
+          DVL_PRINTF("[AT << %lu ms] %s\n", millis(), _rxLine.c_str());
+        }
       }
       _rxLine = "";
     } else if (c != '\r') {
@@ -183,6 +187,7 @@ void forceModemTechReconfig() {
 }
 
 void notifyModemReset() {
+  clockModemReset();
   isModemReady = false;
   isModemConnected = false;
   isGprsActive = false;
@@ -317,8 +322,8 @@ void modemRestart() {
 
 bool isModemOn() {
   // Limpiamos el buffer del puerto serie
-  while (SerialAT.available()) {
-    SerialAT.read();
+  while (modemStream.available()) {
+    modemStream.read();
   }
 
   // Hacemos hasta 3 intentos rápidos de enviar AT
@@ -330,8 +335,8 @@ bool isModemOn() {
     unsigned long start = millis();
     String response = "";
     while (millis() - start < 400) {
-      if (SerialAT.available()) {
-        char c = SerialAT.read();
+      if (modemStream.available()) {
+        char c = modemStream.read();
         response += c;
         if (response.indexOf("OK") != -1) {
           if (modemDebugLevel >= 2) {
@@ -416,90 +421,6 @@ void printModemInfo(TinyGsm &modem, String &res) {
     DVL_PRINTLN(res);
   }
   res = "";
-}
-
-// ==================== Sincronizacion de Reloj NTP ====================
-
-bool updateClockFromNTP(TinyGsm &modem) {
-  String res;
-  DVL_PRINTLN("[NTP] Solicitando sincronizacion...");
-  modem.sendAT("+CNTP=\"pool.ntp.org\",0");
-  if (modem.waitResponse(1000L, res) == 1) {
-    if (modemDebugLevel >= 1) DVL_PRINTLN("[NTP-DBG] Respuesta +CNTP: " + res);
-  }
-  res = "";
-
-  // Ejecutamos la peticion NTP asincrona del SIM7000
-  modem.sendAT("+CNTP");
-  modem.waitResponse(3000L, res);
-  res = "";
-
-  delay(2000);  // Espera para que la hora se actualice en el modem
-
-  DVL_PRINTLN("[NTP] Leyendo hora desde el modem...");
-  modem.sendAT("+CCLK?");
-
-  if (modem.waitResponse(1000L, res) == 1) {
-    if (modemDebugLevel >= 1) DVL_PRINTLN(res);
-  }
-
-  int index = res.indexOf("+CCLK:");
-  if (index != -1) {
-    int start = res.indexOf("\"", index);
-    int end = res.indexOf("\"", start + 1);
-    if (start != -1 && end != -1) {
-      String clockStr = res.substring(start, end + 1);  // ej: "25/06/03,10:28:55+00"
-      DVL_PRINTLN("[NTP] Hora obtenida: " + clockStr);
-      updateInternalClock(clockStr);
-      res = "";
-      return true;
-    }
-  }
-
-  DVL_PRINTLN("[NTP] No se pudo parsear la hora del modem");
-  return false;
-}
-
-String currentTime = "00/00/00,00:00:00+00";  // formato del modem
-
-void updateInternalClock(String clockString) {
-  struct tm tm;
-  memset(&tm, 0, sizeof(tm));
-
-  // clockString: "25/06/03,10:28:55-12"
-  int yy, MM, dd, hh, mm, ss, tz;
-  char tz_sign = '+';
-  tz = 0;
-
-  if (sscanf(clockString.c_str(), "\"%2d/%2d/%2d,%2d:%2d:%2d%c%2d", &yy, &MM, &dd, &hh, &mm, &ss, &tz_sign, &tz) >= 6) {
-    tm.tm_year = 2000 + yy - 1900;  // Año desde 1900
-    tm.tm_mon = MM - 1;             // Mes 0-11
-    tm.tm_mday = dd;
-    tm.tm_hour = hh;
-    tm.tm_min = mm;
-    tm.tm_sec = ss;
-
-    // Asumimos que mktime trata esta tm como UTC (dado que seteamos el env timezone a 0)
-    time_t t = mktime(&tm);
-
-    // Corregir mediante el uso de huso horario devuelto (tz viene expresado en cuartos de hora)
-    if (tz > 0) {
-      int offsetSecs = tz * 15 * 60;
-      if (tz_sign == '+') {
-        t -= offsetSecs; // El tiempo local le lleva N horas a UTC -> restamos para volver al UTC absoluto
-      } else if (tz_sign == '-') {
-        t += offsetSecs; // El tiempo local atrasa N horas a UTC -> sumamos para volver al UTC absoluto
-      }
-    }
-
-    struct timeval now = { .tv_sec = t };
-    settimeofday(&now, NULL);
-
-    DVL_PRINTLN("[RTC] Reloj interno sincronizado a UTC absoluto:");
-    DVL_PRINTLN(ctime(&t));
-  } else {
-    DVL_PRINTLN("[RTC] Error al parsear +CCLK");
-  }
 }
 
 // ==================== Gestion de Registro en Red Celular ====================
