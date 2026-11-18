@@ -28,6 +28,7 @@
 #include "GPRS.h"
 #include "MQTT.h"
 #include "Modbus.h"
+#include "MotorEventos.h"
 #include "SerialSecundario.h"
 #include "TensionAlimentacion.h"
 #include "WebServerConfig.h"
@@ -52,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.18.01";
+String versionado = "V07.19.01";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -333,6 +334,7 @@ void setup() {
   flash_init();
   initADC();
   initTensionAlimentacion();
+  initMotorEventos();
 
   // Inicializacion del sensor
   sensor->begin();
@@ -420,6 +422,15 @@ void loop() {
   }
 
   if (now - last_100ms_event >= 100) {
+    static float vPrinActual = 0.0f;
+    static float vBackActual = 0.0f;
+    static unsigned long lastTensionRead = 0;
+    if (now - lastTensionRead >= 500 || lastTensionRead == 0) {
+      lastTensionRead = now;
+      vPrinActual = leer_tension_principal();
+      vBackActual = leer_tension_backup();
+    }
+    procesarMotorEventos(vPrinActual, vBackActual, ADCValue[0], ADCValue[1]);
     last_100ms_event = now;
     if (++cADC >= tADC) {
       procesarADC(ADCValue);
@@ -446,6 +457,7 @@ void loop() {
         DVL_PRINTLN("[GPS] Entrando a fase GPS bloqueante...");
         enableGPS();
         float lat, lon;
+        int gpsYear = 0, gpsMonth = 0, gpsDay = 0, gpsHour = 0, gpsMin = 0, gpsSec = 0;
         unsigned long tiempoInicioBloqueo = millis();
         bool fix_conseguido = false;
 
@@ -453,7 +465,7 @@ void loop() {
                millis() - tiempoInicioBloqueo < tiempoLimiteGPS) {
 
           esp_task_wdt_reset();
-          if (modem.getGPS(&lat, &lon)) {
+          if (modem.getGPS(&lat, &lon, 0, 0, 0, 0, 0, &gpsYear, &gpsMonth, &gpsDay, &gpsHour, &gpsMin, &gpsSec)) {
             fix_conseguido = true;
             String nuevaLat = String(lat, 6);
             String nuevaLon = String(lon, 6);
@@ -467,6 +479,12 @@ void loop() {
             DVL_PRINTLN("GPS FIX conseguido:");
             DVL_PRINTLN("Latitud actual: " + ultimaLat);
             DVL_PRINTLN("Longitud actual: " + ultimaLon);
+
+            if (gpsYear >= 2025) {
+              setInternalClockFromGPS(gpsYear, gpsMonth, gpsDay, gpsHour, gpsMin, gpsSec);
+              relojActualizado = true;
+              ultimaActualizacionNTP = millis();
+            }
 
             guardar_en_flash("lat", nuevaLat);
             guardar_en_flash("lon", nuevaLon);
@@ -655,6 +673,14 @@ void loop() {
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
+        // Alimentar motor de eventos con telemetria BLE indexada por MAC
+        float bTemp = (bleData.temperature != 0.0f) ? bleData.temperature : 0.0f;
+        float bHum  = (bleData.humidity != 0.0f) ? bleData.humidity : 0.0f;
+        float bDoor = bleData.hasDoorOpen ? (bleData.doorOpen ? 1.0f : 0.0f) : (float)bleData.door;
+        float bMov  = bleData.hasMotionStatus ? (float)bleData.motion : (bleData.hasPirRaw ? (float)bleData.pirRaw : 0.0f);
+        float bBat  = (float)bleData.batteryLevel;
+        actualizarDatosBLE(bleData.mac, bTemp, bHum, bDoor, bMov, bBat);
+
         // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
   topicBLE.toUpperCase();

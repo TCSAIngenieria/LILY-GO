@@ -20,6 +20,7 @@ ModemDebugStream modemStream(SerialAT);
 bool isModemReady = false;
 bool isModemConnected = false;
 bool isGprsActive = false;
+bool gpsTimeSynced = false;
 static bool modeConfigured = false;
 static unsigned long lastConnectAttempt = 0;
 static unsigned long modeWindowStart = 0;
@@ -462,6 +463,26 @@ bool updateClockFromNTP(TinyGsm &modem) {
 
 String currentTime = "00/00/00,00:00:00+00";  // formato del modem
 
+void setInternalClockFromGPS(int year, int month, int day, int hour, int minute, int second) {
+  if (year < 2025) return;
+  struct tm tm;
+  memset(&tm, 0, sizeof(tm));
+  tm.tm_year = year - 1900;
+  tm.tm_mon  = month - 1;
+  tm.tm_mday = day;
+  tm.tm_hour = hour;
+  tm.tm_min  = minute;
+  tm.tm_sec  = second;
+
+  time_t t = mktime(&tm);
+  struct timeval now = { .tv_sec = t, .tv_usec = 0 };
+  settimeofday(&now, NULL);
+  gpsTimeSynced = true;
+
+  DVL_PRINTLN("[GPS-RTC] Reloj interno sincronizado directamente desde satelites GPS (GMT/UTC):");
+  DVL_PRINTLN(ctime(&t));
+}
+
 void updateInternalClock(String clockString) {
   struct tm tm;
   memset(&tm, 0, sizeof(tm));
@@ -482,8 +503,9 @@ void updateInternalClock(String clockString) {
     // Asumimos que mktime trata esta tm como UTC (dado que seteamos el env timezone a 0)
     time_t t = mktime(&tm);
 
-    // Corregir mediante el uso de huso horario devuelto (tz viene expresado en cuartos de hora)
-    if (tz > 0) {
+    // Si el GPS ya posicionó en esta sesión, el RTC interno del SIM7000G (+CCLK)
+    // ya tiene la hora en UTC aunque conserve la etiqueta de huso NITZ (-12).
+    if (!gpsTimeSynced && tz > 0) {
       int offsetSecs = tz * 15 * 60;
       if (tz_sign == '+') {
         t -= offsetSecs; // El tiempo local le lleva N horas a UTC -> restamos para volver al UTC absoluto

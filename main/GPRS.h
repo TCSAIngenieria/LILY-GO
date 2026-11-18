@@ -30,6 +30,7 @@ extern uint8_t modemTechMode;   // 0=Auto (CAT-M1 -> NB-IoT -> 2G), 1=Fijo CAT-M
 extern bool isModemReady;
 extern bool isModemConnected;
 extern bool isGprsActive;
+extern bool gpsTimeSynced;
 
 // Interceptor de Stream para visualizar comandos AT crudos en tiempo real cuando modemDebugLevel == 2
 class ModemDebugStream : public Stream {
@@ -61,6 +62,7 @@ void printModemInfo(TinyGsm &modem, String &res);
 void updateNetworkConnection(TinyGsm &modem);
 bool updateClockFromNTP(TinyGsm &modem);
 void updateInternalClock(String clockString);
+void setInternalClockFromGPS(int year, int month, int day, int hour, int minute, int second);
 String printCurrentTime();
 String getGSMTech();
 void getModemSignalInfo(TinyGsm &modem, String &rsrq, String &rsrp, String &rssi);

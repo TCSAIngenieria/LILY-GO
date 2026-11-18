@@ -35,10 +35,6 @@ float leer_tension_backup() {
   float voltage = aplicarCalibracionTensionAlimentacion(
       raw, FACTOR_TENSION_BACKUP, OFFSET_TENSION_BACKUP);
 
-  DVL_PRINT("Tension_backup (IO35/VVBAT): ");
-  DVL_PRINT(voltage);
-  DVL_PRINTLN(" V");
-
   return voltage;
 }
 
@@ -47,10 +43,6 @@ float leer_tension_principal() {
   float raw = readVoltageTensionAlimentacion(PIN_TENSION_PRINCIPAL);
   float voltage = aplicarCalibracionTensionAlimentacion(
       raw, FACTOR_TENSION_PRINCIPAL, OFFSET_TENSION_PRINCIPAL);
-
-  DVL_PRINT("Tension_principal (GPIO36/SOLAR_IN): ");
-  DVL_PRINT(voltage);
-  DVL_PRINTLN(" V");
 
   return voltage;
 }
