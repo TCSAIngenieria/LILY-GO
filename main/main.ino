@@ -52,7 +52,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.18.05";
+String versionado = "V07.19.00";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -201,17 +201,8 @@ void setup() {
 
   iniciarSerialModem();
 
-  preferences.begin("serial_cfg", true);
-  serialBaud = preferences.getULong("baud", 4800);
-  preferences.end();
-
-  SensorSerial.setRxBufferSize(2048);
-  SensorSerial.begin(serialBaud, SERIAL_8N1, 32,
-                     33); // PUERTO SERIAL EXTERNO   RX=GPIO32, TX=GPIO33
-
-  // Inicializar Modbus sobre el puerto secundario
-  modbus_begin(&SensorSerial);
-  modbus_load_from_prefs();
+  cargarConfiguracionUART2();
+  cargarConfiguracionEnvioModbus();
 
   preferences.begin("enables", true);
   en_sensor = preferences.getUInt("sensor", 0);
@@ -227,6 +218,13 @@ void setup() {
   if (en_serial > 2) {
     en_serial = 0;
   }
+
+  // UART2: aplica la paridad guardada solo si arranca en modo Modbus.
+  if (!iniciarUART2(en_modbus != 0)) {
+    DVL_PRINTLN("[UART2] ERROR: No se pudo iniciar el puerto secundario.");
+  }
+  modbus_begin(&SensorSerial);
+  modbus_load_from_prefs();
 
   // --- Contador de reinicios y Lectura de AP Mode ---
   preferences.begin("device", false);
@@ -244,7 +242,7 @@ void setup() {
   preferences.begin("wifi", true);
   // ssid = preferences.getString("ssid", "Flash-PaPeR");
   // password = preferences.getString("password", "Ayanami84");
-  ssid = preferences.getString("ssid", "Invitados");
+  ssid = preferences.getString("ssid", "TCSA Invitados");
   password = preferences.getString("password", "TCinvitados");
   // ssid = preferences.getString("ssid", "TCSA");
   // password = preferences.getString("password", "ccreto3236TAM");
@@ -348,9 +346,11 @@ void setup() {
   /*CONFIGURACIoN WEB SERVER ADMIN*/
   preferences.begin("mqtt", true);
   MQTT_BROKER = preferences.getString(
-      // "ip", "192.168.7.24"); // ← solo usa este si no hay guardado
-      "ip", "iot.tcsa.com.ar");
-  MQTT_PORT = preferences.getInt("port", 1883); // ← idem
+      // "ip", "192.168.7.24"); // test old ingenieria 
+      "ip", "iot.tcsa.com.ar"); // test y produccion
+  MQTT_PORT = preferences.getInt(
+      // "port", 1884); // test ingenieria
+      "port", 1883); // produccion
   preferences.end();
 
   /*BROKER MQTT*/
@@ -378,9 +378,9 @@ void setup() {
   cargarConfiguracionParser();
 
   /*Configuracion MQTT*/
-  mqtt.setSocketTimeout(20); // Timeout de socket reducido a 20s para detectar caidas mas rapido
-  mqtt.setKeepAlive(30);     // Ping cada 30 segundos para mantener vivo el NAT celular y detectar desconexiones
-  mqtt.setBufferSize(1024);
+  mqtt.setSocketTimeout(20);
+  mqtt.setKeepAlive(30);
+  mqtt.setBufferSize(2048);
   mqtt.setServer(MQTT_BROKER.c_str(), MQTT_PORT);
   mqtt.setCallback(mqttCallback);
 
@@ -800,23 +800,40 @@ void loop() {
 
       DVL_PRINT("Modbus habilitado. Enviando dato por MQTT...");
 
-      unsigned long numPkt = obtener_y_avanzar_numero_paquete();
-      String topicModbus = topic1 + "/MODBUS";
-  topicModbus.toUpperCase();
-      String jsonmodbus = create_mqtt_json_modbus(
-          topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
-          leer_tension_backup(), leer_tension_principal(), numPkt);
-
-      if (mqtt.connected()) {
-        if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
-          DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
-        } else {
-          if (publish_mqtt_json(topicModbus, jsonmodbus)) {
-            mqttUltimaConexionOK = millis();
-          }
+      for (int frameIdx = 1; frameIdx <= MODBUS_MAX_FRAMES; frameIdx++) {
+        ModbusFrameCfg frame;
+        if (!modbus_get_frame(frameIdx, frame) || !frame.used) {
+          continue;
         }
-      } else {
-        flash_save_packet(jsonmodbus.c_str());
+
+        // Un topic por consulta configurada (idx), incluso para el mismo esclavo.
+        String topicModbus = topic1 + "/MODBUS/" + String(frameIdx);
+        topicModbus.toUpperCase();
+
+        unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+        String jsonmodbus = create_mqtt_json_modbus(
+            topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
+            leer_tension_backup(), leer_tension_principal(), numPkt, frameIdx);
+
+        if (envioModbusEnCola() && !flash_buffer_empty()) {
+          if (topicModbus.length() == 0 || jsonmodbus.length() == 0 ||
+              !flash_save_packet(jsonmodbus.c_str())) {
+            DVL_PRINTLN("[MODBUS] No se pudo encolar el reporte periodico.");
+          } else {
+            DVL_PRINTLN("[MODBUS] Reporte periodico encolado tras el historico.");
+          }
+        } else if (mqtt.connected()) {
+          if (topicModbus.length() == 0 || jsonmodbus.length() == 0) {
+            DVL_PRINTLN(" ERROR: Topico o mensaje MQTT vacio. No se publica.");
+          } else if (publish_mqtt_json(topicModbus, jsonmodbus)) {
+            mqttUltimaConexionOK = millis();
+          } else {
+            DVL_PRINTLN("Fallo al publicar sensor Modbus online");
+          }
+        } else {
+          flash_save_packet(jsonmodbus.c_str());
+          DVL_PRINTLN("MQTT desconectado. Datos Modbus guardados en flash.");
+        }
       }
     }
 
@@ -902,7 +919,31 @@ void loop() {
 
   // Solo ciclo Modbus si está habilitado
   if (en_modbus && modbus_get_enabled()) {
-    modbus_loop();
+    const uint8_t changedIdx = modbus_loop();
+    if (changedIdx != 0) {
+      // Publicar antes de consultar otra ranura para conservar cada cambio.
+      String topicModbus = topic1 + "/MODBUS/" + String(changedIdx);
+      topicModbus.toUpperCase();
+      unsigned long numPkt = obtener_y_avanzar_numero_paquete();
+      String jsonmodbus = create_mqtt_json_modbus(
+          topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
+          leer_tension_backup(), leer_tension_principal(), numPkt, changedIdx);
+
+      DVL_PRINTF("[MODBUS] Cambio de datos en idx=%u. Procesando envio...\n",
+                 (unsigned int)changedIdx);
+      const bool historicoPendiente =
+          envioModbusEnCola() && !flash_buffer_empty();
+      if (jsonmodbus.length() > 0 &&
+          (historicoPendiente ||
+           !(mqtt.connected() && publish_mqtt_json(topicModbus, jsonmodbus)))) {
+        // Tambien encolar si el intento online falla; STIME sigue independiente.
+        if (flash_save_packet(jsonmodbus.c_str())) {
+          DVL_PRINTLN("[MODBUS] Cambio encolado en flash para envio posterior.");
+        } else {
+          DVL_PRINTLN("[MODBUS] No se pudo encolar el cambio en flash.");
+        }
+      }
+    }
   }
 
   if (en_wifi == 2) {
@@ -975,6 +1016,44 @@ unsigned long obtener_y_avanzar_numero_paquete() {
   return actual;
 }
 
+void imprimirDiagnosticoWiFi() {
+  const char *hostname = WiFi.getHostname();
+
+  DVL_PRINTLN("");
+  DVL_PRINTLN("========== DIAGNOSTICO WIFI ==========");
+  DVL_PRINT("ID LILY: ");
+  DVL_PRINTLN(ident);
+  DVL_PRINT("Hostname: ");
+  DVL_PRINTLN(hostname ? hostname : "N/A");
+  DVL_PRINT("SSID: ");
+  DVL_PRINTLN(WiFi.SSID());
+  DVL_PRINT("BSSID/AP MAC: ");
+  DVL_PRINTLN(WiFi.BSSIDstr());
+  DVL_PRINT("MAC LILY (STA): ");
+  DVL_PRINTLN(WiFi.macAddress());
+  DVL_PRINT("IP asignada: ");
+  DVL_PRINTLN(WiFi.localIP());
+  DVL_PRINT("Mascara de red: ");
+  DVL_PRINTLN(WiFi.subnetMask());
+  DVL_PRINT("Gateway: ");
+  DVL_PRINTLN(WiFi.gatewayIP());
+  DVL_PRINT("DNS primario: ");
+  DVL_PRINTLN(WiFi.dnsIP(0));
+  DVL_PRINT("DNS secundario: ");
+  DVL_PRINTLN(WiFi.dnsIP(1));
+  DVL_PRINT("Canal WiFi: ");
+  DVL_PRINTLN(WiFi.channel());
+  DVL_PRINT("RSSI: ");
+  DVL_PRINT(WiFi.RSSI());
+  DVL_PRINTLN(" dBm");
+  DVL_PRINTLN("Asignacion IP: DHCP");
+  DVL_PRINT("Broker MQTT: ");
+  DVL_PRINT(MQTT_BROKER);
+  DVL_PRINT(":");
+  DVL_PRINTLN(MQTT_PORT);
+  DVL_PRINTLN("======================================");
+}
+
 void conectar_WiFi() {
   if (en_wifi != 1) {
     DVL_PRINTLN("WiFi no habilitado en modo Cliente (EN_WIFI != 1).");
@@ -1000,6 +1079,7 @@ void conectar_WiFi() {
     wifiConfigurado = true;
     TINY_GSM_USE_WIFI = true;
     TINY_GSM_USE_GPRS = false;
+    imprimirDiagnosticoWiFi();
   } else {
     DVL_PRINTLN("No se pudo conectar a WiFi. Esperando boton...");
     wifiConfigurado = false;

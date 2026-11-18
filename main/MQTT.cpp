@@ -20,6 +20,7 @@ extern FOTAClass FOTA;
 
 extern String ident;
 extern String versionado;
+extern uint32_t serialBaud;
 extern Preferences preferences;
 
 extern bool mqttActivo;
@@ -228,18 +229,21 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
 
 String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
                                String latitud, String longitud, float Vbackup,
-                               float Vprincipal, unsigned long numeroPaquete) {
-  StaticJsonDocument<512> doc;
+                               float Vprincipal, unsigned long numeroPaquete,
+                               uint8_t frameIdx) {
+  ModbusFrameCfg frame;
+  if (!modbus_get_frame(frameIdx, frame) || !frame.used) return "";
+  StaticJsonDocument<2048> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
+  doc["baud"] = serialBaud;
+  doc["paridad"] = obtenerParidadModbus();
 
-  // Recorrer las consultas configuradas
-  for (int i = 0; i < MODBUS_MAX_FRAMES; i++) {
-    if (modbus_lastValues[i].length() > 0) {
-      String key = "INDEX" + String(i + 1);
-      doc[key] = modbus_lastValues[i];
-    }
-  }
+  // Un mensaje por consulta; el topic identifica el idx, no el ID del esclavo.
+  doc["consulta"] = modbus_get_request_hex(frameIdx);
+  doc["respuesta"] = modbus_lastValues[frameIdx - 1];
+  doc["datos_hexa"] = modbus_lastData[frameIdx - 1];
+  doc["date_respuesta"] = modbus_lastResponseDate[frameIdx - 1];
 
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
@@ -249,7 +253,7 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
 
-  char payload[512];
+  char payload[2048];
   serializeJson(doc, payload);
   return String(payload);
 }

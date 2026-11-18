@@ -12,6 +12,7 @@ extern TinyGsm modem;
 #include "MQTT.h"
 #include <WiFi.h>
 #include "BridgeAP.h"
+#include <errno.h>
 
 extern Preferences preferences;
 
@@ -44,6 +45,77 @@ uint32_t serialBaud = 4800;
 uint en_wifi;
 extern bool TINY_GSM_USE_WIFI;
 extern bool TINY_GSM_USE_GPRS;
+
+enum ParidadModbus : uint8_t { PARIDAD_NONE = 0, PARIDAD_EVEN = 1, PARIDAD_ODD = 2 };
+static ParidadModbus paridadModbus = PARIDAD_NONE;
+static bool modbusEncolaConHistorico = false;
+
+void cargarConfiguracionEnvioModbus() {
+  modbusEncolaConHistorico = false;
+  if (!preferences.begin("modbus_envio", true)) return;
+  modbusEncolaConHistorico = preferences.getBool("cola_hist", false);
+  preferences.end();
+}
+
+bool envioModbusEnCola() { return modbusEncolaConHistorico; }
+
+const char *obtenerParidadModbus() {
+  switch (paridadModbus) {
+    case PARIDAD_EVEN: return "EVEN";
+    case PARIDAD_ODD: return "ODD";
+    default: return "NONE";
+  }
+}
+
+void cargarConfiguracionUART2() {
+  serialBaud = 4800;
+  paridadModbus = PARIDAD_NONE;
+  if (!preferences.begin("serial_cfg", true)) return;
+  serialBaud = preferences.getULong("baud", 4800);
+  uint8_t valor = preferences.getUChar("mb_parity", PARIDAD_NONE);
+  preferences.end();
+  if (valor <= PARIDAD_ODD) paridadModbus = static_cast<ParidadModbus>(valor);
+}
+
+static bool configurarUART2(uint32_t baud, ParidadModbus paridad, bool modoModbus) {
+  uint32_t formato = SERIAL_8N1;
+  if (modoModbus && paridad == PARIDAD_EVEN) formato = SERIAL_8E1;
+  else if (modoModbus && paridad == PARIDAD_ODD) formato = SERIAL_8O1;
+
+  if (SensorSerial) SensorSerial.flush();
+  SensorSerial.end();
+  SensorSerial.setRxBufferSize(2048);
+  SensorSerial.begin(baud, formato, 32, 33);
+  return static_cast<bool>(SensorSerial);
+}
+
+bool iniciarUART2(bool modoModbus) {
+  return configurarUART2(serialBaud, paridadModbus, modoModbus);
+}
+
+// Ante un fallo al reconfigurar, intentar recuperar el formato anterior.
+static bool cambiarUART2(uint32_t baud, ParidadModbus paridad, bool modoModbus) {
+  if (configurarUART2(baud, paridad, modoModbus)) return true;
+  if (!configurarUART2(serialBaud, paridadModbus, en_modbus != 0)) {
+    Serial.println("[UART2] ERROR: No se pudo restaurar la configuracion anterior.");
+  }
+  return false;
+}
+
+// Validar el numero completo antes de reducirlo a uint8_t (257 no es idx 1).
+static bool parseModbusIndex(String value, uint8_t &idx) {
+  value.trim();
+  if (value.length() == 0) return false;
+  char *end = nullptr;
+  errno = 0;
+  long parsed = strtol(value.c_str(), &end, 0);
+  if (errno == ERANGE || end == value.c_str() || *end != '\0' ||
+      parsed < 1 || parsed > MODBUS_MAX_FRAMES) {
+    return false;
+  }
+  idx = static_cast<uint8_t>(parsed);
+  return true;
+}
 
 String procesarComando(String comando) {
   comando.trim();
@@ -156,16 +228,86 @@ String procesarComando(String comando) {
     unsigned long val = strtoul(comando.substring(10).c_str(), NULL, 10);
     if (val == 1200 || val == 2400 || val == 4800 || val == 9600 ||
         val == 19200 || val == 38400 || val == 57600 || val == 115200) {
-      serialBaud = val;
-      preferences.begin("serial_cfg", false);
-      preferences.putULong("baud", serialBaud);
-      preferences.end();
-      SensorSerial.end();
-      SensorSerial.setRxBufferSize(2048);
-      SensorSerial.begin(serialBaud, SERIAL_8N1, 32, 33);
-      respuesta = ">> BAUD RATE SETEADO A " + String(serialBaud);
+      if (val == serialBaud) {
+        respuesta = ">> BAUD RATE SETEADO A " + String(serialBaud);
+      } else if (!cambiarUART2(val, paridadModbus, en_modbus != 0)) {
+        respuesta = "ERROR: No se pudo configurar UART2; verificar el puerto";
+      } else {
+        bool guardado = preferences.begin("serial_cfg", false);
+        if (guardado) {
+          guardado = preferences.putULong("baud", val) == sizeof(uint32_t);
+          preferences.end();
+        }
+        if (guardado) {
+          serialBaud = val;
+          modbus_clear_last_values();
+          respuesta = ">> BAUD RATE SETEADO A " + String(serialBaud);
+        } else {
+          if (!iniciarUART2(en_modbus != 0)) Serial.println("[UART2] ERROR al restaurar baud anterior.");
+          respuesta = "ERROR: No se pudo guardar baud; verificar configuracion UART2";
+        }
+      }
     } else {
       respuesta = "ERROR: Baud rate no soportado (1200,2400,4800,9600,19200,38400,57600,115200)";
+    }
+
+  } else if (comando.startsWith("DVL+SPARITY_MODBUS=")) {
+    String valor = comando.substring(String("DVL+SPARITY_MODBUS=").length());
+    valor.trim();
+    valor.toUpperCase();
+    ParidadModbus nueva;
+    if (valor == "NONE") nueva = PARIDAD_NONE;
+    else if (valor == "EVEN") nueva = PARIDAD_EVEN;
+    else if (valor == "ODD") nueva = PARIDAD_ODD;
+    else {
+      respuesta = "ERROR: Paridad invalida (NONE, EVEN, ODD)";
+      Serial.println(respuesta);
+      return respuesta;
+    }
+
+    if (nueva == paridadModbus) {
+      respuesta = "PARITY_MODBUS=" + String(obtenerParidadModbus());
+    } else if (en_modbus && !cambiarUART2(serialBaud, nueva, true)) {
+      respuesta = "ERROR: No se pudo configurar UART2; verificar el puerto";
+    } else {
+      bool guardado = preferences.begin("serial_cfg", false);
+      if (guardado) {
+        guardado = preferences.putUChar("mb_parity", nueva) == sizeof(uint8_t);
+        preferences.end();
+      }
+      if (guardado) {
+        paridadModbus = nueva;
+        modbus_clear_last_values();
+        respuesta = "PARITY_MODBUS=" + String(obtenerParidadModbus());
+      } else {
+        if (en_modbus && !iniciarUART2(true)) Serial.println("[UART2] ERROR al restaurar paridad anterior.");
+        respuesta = "ERROR: No se pudo guardar paridad; verificar configuracion UART2";
+      }
+    }
+
+  } else if (comando.startsWith("DVL+SENVIO_MODBUS=")) {
+    String valor = comando.substring(String("DVL+SENVIO_MODBUS=").length());
+    valor.trim();
+    valor.toUpperCase();
+    if (valor != "COLA" && valor != "DIRECTO") {
+      respuesta = "ERROR: Envio Modbus invalido (COLA, DIRECTO)";
+    } else {
+      const bool nuevo = valor == "COLA";
+      if (nuevo == modbusEncolaConHistorico) {
+        respuesta = "ENVIO_MODBUS=" + valor;
+      } else {
+        bool guardado = preferences.begin("modbus_envio", false);
+        if (guardado) {
+          guardado = preferences.putBool("cola_hist", nuevo) == sizeof(bool);
+          preferences.end();
+        }
+        if (guardado) {
+          modbusEncolaConHistorico = nuevo;
+          respuesta = "ENVIO_MODBUS=" + valor;
+        } else {
+          respuesta = "ERROR: No se pudo guardar el modo de envio Modbus";
+        }
+      }
     }
 
     /* COMANDO APN */
@@ -249,6 +391,12 @@ String procesarComando(String comando) {
     String v = comando.substring(String("DVL+EN_SERIAL=").length());
     v.trim();
     int val = v.toInt();
+    if ((val == 1 || val == 2) && (en_serial == 0 || en_modbus != 0) &&
+        !cambiarUART2(serialBaud, paridadModbus, false)) {
+      respuesta = "ERROR: No se pudo configurar UART2 para serial";
+      Serial.println(respuesta);
+      return respuesta;
+    }
     if (val == 1 || val == 2) {
       en_serial = val;
     } else {
@@ -274,6 +422,12 @@ String procesarComando(String comando) {
   else if (comando.startsWith("DVL+EN_MODBUS=")) {
     String v = comando.substring(String("DVL+EN_MODBUS=").length());
     v.trim();
+    if (v == "1" && en_modbus == 0 &&
+        !cambiarUART2(serialBaud, paridadModbus, true)) {
+      respuesta = "ERROR: No se pudo configurar UART2 para Modbus";
+      Serial.println(respuesta);
+      return respuesta;
+    }
     en_modbus = (v == "1") ? 1 : 0;
 
     preferences.begin("enables", false);
@@ -446,8 +600,8 @@ String procesarComando(String comando) {
   }
 
   /* comando para configurar tramas:
-     DVL+MODBUS=idx,ID,FUNC,LONG
-     idx: 1..5, ID/FUNC/LONG en decimal o 0xNN hex
+     DVL+MODBUS=idx,ID,FUNC,ADDR,QTY
+     idx: 1..MODBUS_MAX_FRAMES, ID/FUNC/ADDR/QTY en decimal o 0xNN hex
   */
   else if (comando.startsWith("DVL+MODBUS=")) {
     String args = comando.substring(String("DVL+MODBUS=").length());
@@ -457,22 +611,27 @@ String procesarComando(String comando) {
     int c2 = (c1 >= 0) ? args.indexOf(',', c1 + 1) : -1;
     int c3 = (c2 >= 0) ? args.indexOf(',', c2 + 1) : -1;
     int c4 = (c3 >= 0) ? args.indexOf(',', c3 + 1) : -1;
+    int c5 = (c4 >= 0) ? args.indexOf(',', c4 + 1) : -1;
 
-    if (c1 < 0 || c2 < 0 || c3 < 0 || c4 < 0) {
+    if (c1 < 0 || c2 < 0 || c3 < 0 || c4 < 0 || c5 >= 0) {
       respuesta = "[ERR] Formato: DVL+MODBUS=idx,ID,FUNC,ADDR,QTY";
     } else {
       auto parseAny = [](const String &s) -> long {
         return strtol(s.c_str(), nullptr, 0);
       };
 
-      uint8_t idx = (uint8_t)parseAny(args.substring(0, c1));
+      uint8_t idx = 0;
+      bool validIdx = parseModbusIndex(args.substring(0, c1), idx);
       uint8_t id = (uint8_t)parseAny(args.substring(c1 + 1, c2));
       uint8_t func = (uint8_t)parseAny(args.substring(c2 + 1, c3));
       uint16_t addr = (uint16_t)parseAny(args.substring(c3 + 1, c4));
-      uint16_t qty = (uint16_t)parseAny(args.substring(c4 + 1));
+      String qtyArg = args.substring(c4 + 1);
+      qtyArg.trim();
 
-      if (idx < 1 || idx > 5) {
-        respuesta = "[ERR] idx debe ser 1..5";
+      uint16_t qty = (uint16_t)parseAny(qtyArg);
+
+      if (!validIdx) {
+        respuesta = "[ERR] idx debe ser 1.." + String(MODBUS_MAX_FRAMES);
       } else {
         bool ok = modbus_set_frame(idx, id, func, addr, qty);
         if (ok) {
@@ -497,10 +656,14 @@ String procesarComando(String comando) {
       respuesta = ok ? "[OK] Todas las tramas Modbus borradas"
                      : "[ERR] No se pudo borrar";
     } else {
-      uint8_t idx = (uint8_t)strtol(arg.c_str(), nullptr, 0);
-      ok = modbus_clear_frame(idx);
-      respuesta = ok ? "[OK] Trama Modbus #" + String(idx) + " borrada"
-                     : "[ERR] idx invalido";
+      uint8_t idx = 0;
+      if (!parseModbusIndex(arg, idx)) {
+        respuesta = "[ERR] idx debe ser 1.." + String(MODBUS_MAX_FRAMES);
+      } else {
+        ok = modbus_clear_frame(idx);
+        respuesta = ok ? "[OK] Trama Modbus #" + String(idx) + " borrada"
+                       : "[ERR] No se pudo borrar la trama";
+      }
     }
   }
 
@@ -511,9 +674,7 @@ String procesarComando(String comando) {
     preferences.end();
     respuesta = "EN_MODBUS=" + String(en_modbus);
   } else if (comando == "DVL+QMODBUS") {
-    // Volcamos a Serial y devolvemos un breve resumen
-    modbus_print_frames();
-    respuesta = "[OK] Ver detalle por Serial";
+    respuesta = modbus_get_frames_summary();
   } else if (comando == "DVL+QFIL") {
     respuesta =
         "FIL0=" + String(filterADC[0][0]) + "," + String(filterADC[0][1]) +
@@ -608,6 +769,13 @@ String procesarComando(String comando) {
 
   } else if (comando == "DVL+QBAUD") {
     respuesta = "BAUD=" + String(serialBaud);
+
+  } else if (comando == "DVL+QPARITY_MODBUS") {
+    respuesta = "PARITY_MODBUS=" + String(obtenerParidadModbus());
+
+  } else if (comando == "DVL+QENVIO_MODBUS") {
+    respuesta = String("ENVIO_MODBUS=") +
+                (modbusEncolaConHistorico ? "COLA" : "DIRECTO");
 
   } else if (comando == "DVL+QEN_BLE") {
     preferences.begin("enables", true);

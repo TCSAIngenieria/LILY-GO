@@ -85,7 +85,10 @@ El dispositivo cuenta con un diseño de firmware modular habilitable bajo demand
 
 ### 4.4 Canal de Telemetría Modbus RTU
 *   Implementación de comandos Modbus Master sobre el puerto serial secundario.
-*   Soporta hasta **5 tramas de consulta** concurrentes configurables por el usuario (especificando ID de esclavo, código de función Modbus [0x03, 0x04, etc.], dirección de registro y cantidad de registros).
+*   Permite configurar hasta **25 consultas** (`idx` 1-25), ejecutadas secuencialmente: una cada 2 segundos como mínimo y 200 ms de espera de respuesta. Cada consulta identifica ID de esclavo, función, dirección inicial y cantidad.
+*   Cada consulta publica también al recibir su primera respuesta válida o cuando cambian sus bytes de datos (datos_hexa) respecto de la última respuesta válida de ese idx. Una respuesta igual actualiza date_respuesta sin disparar otro envío; timeout, trama inválida o excepción no disparan el evento. Se conserva el mismo JSON y topic por idx. La publicación periódica por DVL+STIME y el keep-alive siguen independientes. Si el evento no puede publicarse, se intenta encolar en la flash existente, con su límite de 511 bytes por mensaje y su capacidad finita; los paquetes más antiguos pueden sobrescribirse al llenarse la cola. El evento se procesa antes de la siguiente consulta, sin esperar STIME. `DVL+SENVIO_MODBUS=DIRECTO|COLA` y `DVL+QENVIO_MODBUS` permiten seleccionar y consultar solo el orden de salida Modbus; `DIRECTO` conserva el comportamiento previo y es el valor inicial. `COLA` agrega al historico pendiente tanto eventos como reportes periodicos, sin cambiar la descarga ni otros sensores.
+*   Baud compartido de UART2 mediante `DVL+SBAUD`; paridad Modbus persistente mediante `DVL+SPARITY_MODBUS=NONE|EVEN|ODD`, consultable con `DVL+QPARITY_MODBUS`. Cada comando conserva el otro parámetro. Modbus utiliza 8N1, 8E1 u 8O1; serial común utiliza 8N1.
+*   Conserva en RAM la última respuesta válida de cada consulta, sus datos y fecha UTC de recepción. Los fallos de lectura no reemplazan estos valores. Reiniciar, reconfigurar o borrar una consulta limpia su lectura; cambiar baud o paridad limpia las lecturas de todas las consultas. Los paquetes históricos guardados en flash se conservan.
 *   *Exclusión Mutua:* La habilitación de Modbus (`en_modbus=1`) apaga de forma segura el módulo Serial Secundario ordinario para evitar conflictos en la UART2 compartida.
 
 ### 4.5 Módulo de Lectura Analógica (ADC)
@@ -98,7 +101,7 @@ El dispositivo cuenta con un diseño de firmware modular habilitable bajo demand
 
 ## 5. Protocolo de Telemetría (MQTT JSON Payloads)
 
-Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-GO/<IDENTIFICADOR>`) se estructuran en formato JSON. Dependiendo de los módulos activos, el firmware transmite diferentes payloads:
+Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-GO/<ID_LILY>`) se estructuran en formato JSON. Dependiendo de los módulos activos, el firmware transmite diferentes payloads:
 
 ### 5.1 Payload Estándar / Serial Secundario
 ```json
@@ -122,19 +125,46 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
 ### 5.2 Payload Modbus RTU
 ```json
 {
-  "topic": "DVL/LILY-GO/OBU_123",
+  "topic": "DVL/LILY-GO/OBU_123/MODBUS/3",
   "ident": "OBU_123",
-  "INDEX1": "0103020A4C",
-  "INDEX2": "010304001F002A",
+  "baud": 4800,
+  "paridad": "EVEN",
+  "consulta": "01 03 00 24 00 02 84 00",
+  "respuesta": "01 03 04 17 EB 06 99 4C 79",
+  "datos_hexa": "17EB0699",
+  "date_respuesta": "2026-06-04 16:03:55",
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
   "Tension_backup": 4.12,
   "Tension_principal": 12.0,
-  "Version": "V04.01.02",
+  "Version": "V07.19.00",
   "index": 483
 }
 ```
+
+Cada consulta configurada se publica por separado en
+`DVL/LILY-GO/<ID_LILY>/MODBUS/<idx>`. El sufijo es la ranura de consulta,
+no el ID del dispositivo. En el ejemplo, idx 3 consulta al dispositivo ID 1.
+Consultas idénticas o dirigidas al mismo dispositivo tienen mensajes independientes.
+El receptor debe adaptar su interpretación de los tópicos y campos al nuevo formato;
+los paquetes históricos pendientes conservan el formato con que fueron guardados.
+
+`consulta` y `respuesta` incluyen las tramas completas con CRC y espacios.
+`datos_hexa` contiene solamente los bytes de datos, en mayúsculas y sin espacios.
+La Lily no interpreta el tipo numérico ni reordena palabras: esa conversión
+corresponde a la plataforma. `date_respuesta` indica el momento de recepción de
+la última respuesta válida; `date`, el armado del mensaje. Ante timeout, CRC
+incorrecto, longitud incorrecta, excepción o ID no coincidente se conserva la
+lectura válida anterior. Sin lectura válida previa, respuesta, datos y fecha
+se publican vacíos. Una lectura válida recibida sin fecha de reloj admisible
+(2024-2099) se guarda con `date_respuesta` vacía, sin completarla retroactivamente.
+
+El límite offline sigue siendo 511 bytes de contenido por mensaje. La cantidad
+de consultas aumenta el número de mensajes por intervalo, no ese límite individual.
+La recepción actual no separa tramas acumuladas ni elimina bytes pendientes antes
+de transmitir; las respuestas tardías requieren una revisión aparte. No se agregó
+un comando de timeout ni se modificaron los tiempos para esta versión.
 
 ### 5.3 Payload de Diagnóstico (Keep-Alive)
 Emitido con información técnica del módem y estado de la red celular:
@@ -216,6 +246,6 @@ Para la puesta en marcha inicial del dispositivo o en caso de fallos de red en c
 
 ## 8. Interfaz de Comandos de Control (CLI / MQTT)
 
-El dispositivo responde a comandos enviados de forma directa por el puerto Serial Principal (UART0) o de forma remota a través del tópico MQTT de entrada `DVL/LILY-GO/<IDENTIFICADOR>/COMANDOS`. Las respuestas se publican en el tópico `/RESPUESTA` o por terminal.
+El dispositivo responde a comandos enviados de forma directa por el puerto Serial Principal (UART0) o de forma remota a través del tópico MQTT de entrada `DVL/LILY-GO/<ID_LILY>/COMANDOS`. Las respuestas se publican en el tópico `/RESPUESTA` o por terminal.
 
-La lista detallada de los comandos operativos, ejemplos de uso y retornos esperados se encuentra completamente documentada en el archivo de referencia técnica: [main/COMANDOS.md](file:///c:/Users/slerotich/Documents/GitHub/LILY-GO/main/COMANDOS.md).
+La lista detallada de los comandos operativos, ejemplos de uso y retornos esperados se encuentra completamente documentada en el archivo de referencia técnica: [main/COMANDOS.md](main/COMANDOS.md).

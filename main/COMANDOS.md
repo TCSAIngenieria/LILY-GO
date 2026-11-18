@@ -20,7 +20,7 @@ Todos los comandos descriptos en este documento pueden ejecutarse de manera indi
 | Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
 |:---|:---|:---|:---|
 | `DVL+ID=<id>` | Define el identificador único del equipo en Flash NVM, actualiza el tópico raíz a `DVL/LILY-GO/<id>` y fuerza la reconexión al Broker MQTT. | `DVL+ID=60001` | `Rident_OK (TOPIC: DVL/LILY-GO/60001)` |
-| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.18.00` |
+| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.00` |
 | `DVL+RESET` | Ejecuta un reinicio inmediato por software del microcontrolador ESP32 (`ESP.restart()`). | `DVL+RESET` | `>> Reiniciando dispositivo...` |
 | `DVL+STIME=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de telemetría de sensores (en segundos). | `DVL+STIME=60` | `TIEMPO SETEADO OK` |
 | `DVL+QTIME` | Consulta el intervalo de publicación de telemetría configurado actualmente. | `DVL+QTIME` | `TIME=60` |
@@ -126,13 +126,54 @@ IP Asignada        : 10.124.88.14
 
 ## 7. Maestro Modbus RTU (Sobre UART2)
 
-| Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
+| Comando | Descripción | Ejemplo | Respuesta |
 |:---|:---|:---|:---|
-| `DVL+EN_MODBUS=<1\|0>` | Habilita (`1`) o deshabilita (`0`) el motor de consultas Modbus RTU sobre `UART2`. Al habilitarse, desactiva automáticamente `EN_SERIAL` (`0`). Publica lecturas bajo el subtópico `/MODBUS`. | `DVL+EN_MODBUS=1` | `>> HABILITADO MODBUS (EN_SERIAL=0)` |
-| `DVL+QEN_MODBUS` | Consulta si el módulo Modbus RTU está habilitado. | `DVL+QEN_MODBUS` | `EN_MODBUS=1` |
-| `DVL+MODBUS=<idx>,<id>,<fn>,<addr>,<qty>` | Programa y guarda en NVM una de las 5 ranuras de consulta cíclica Modbus (admite valores decimales o hexadecimales `0xNN`):<br>• `<idx>`: Ranura de consulta (`1` a `5`).<br>• `<id>`: Dirección del esclavo Modbus (`1..247`).<br>• `<fn>`: Código de función (`3` = Holding Registers, `4` = Input Registers).<br>• `<addr>`: Dirección inicial de registro.<br>• `<qty>`: Cantidad de registros de 16 bits a leer. | `DVL+MODBUS=1,10,3,0x00,2` | `[OK] MODBUS#1 ID=0xa FUNC=0x3 ADDR=0x0 QTY=0x2` |
-| `DVL+MODBUSCLR=<idx\|ALL>` | Borra una ranura de consulta Modbus específica (`1..5`) o limpia las 5 ranuras (`ALL`). | `DVL+MODBUSCLR=ALL` | `[OK] Todas las tramas Modbus borradas` |
-| `DVL+QMODBUS` | Imprime por puerto serie la tabla detallada de las 5 configuraciones de tramas Modbus y sus últimos valores leídos. | `DVL+QMODBUS` | `[OK] Ver detalle por Serial` |
+| `DVL+EN_MODBUS=<1\|0>` | Habilita o deshabilita Modbus en UART2. Al habilitarlo, desactiva `EN_SERIAL`. | `DVL+EN_MODBUS=1` | `>> HABILITADO MODBUS (EN_SERIAL=0)` |
+| `DVL+QEN_MODBUS` | Consulta si Modbus está habilitado. | `DVL+QEN_MODBUS` | `EN_MODBUS=1` |
+| `DVL+SPARITY_MODBUS=<NONE\|EVEN\|ODD>` | Configura y guarda la paridad de Modbus. El valor inicial es `NONE`; si Modbus está inactivo se aplica al habilitarlo. | `DVL+SPARITY_MODBUS=EVEN` | `PARITY_MODBUS=EVEN` |
+| `DVL+QPARITY_MODBUS` | Consulta la paridad guardada para Modbus, incluso si está deshabilitado. | `DVL+QPARITY_MODBUS` | `PARITY_MODBUS=EVEN` |
+| `DVL+SENVIO_MODBUS=<DIRECTO\|COLA>` | Configura y guarda el envio de reportes Modbus. `DIRECTO` es el valor inicial; `COLA` agrega el reporte al final de la cola si hay historicos pendientes. | `DVL+SENVIO_MODBUS=COLA` | `ENVIO_MODBUS=COLA` |
+| `DVL+QENVIO_MODBUS` | Consulta el modo de envio Modbus guardado. | `DVL+QENVIO_MODBUS` | `ENVIO_MODBUS=DIRECTO` |
+| `DVL+MODBUS=<idx>,<id>,<func>,<addr>,<qty>` | Guarda una consulta en una de las 25 ranuras (`idx` 1-25). Admite números decimales o `0x` hexadecimales. | `DVL+MODBUS=25,3,3,0,1` | `[OK] MODBUS#25 ID=0x3 FUNC=0x3 ADDR=0x0 QTY=0x1` |
+| `DVL+MODBUSCLR=<idx\|ALL>` | Borra una ranura o todas. | `DVL+MODBUSCLR=ALL` | `[OK] Todas las tramas Modbus borradas` |
+| `DVL+QMODBUS` | Devuelve las consultas configuradas. | `DVL+QMODBUS` | `[OK] MODBUS#1 ID=0x03 FUNC=0x03 ADDR=0x0000 QTY=0x0001` |
+
+`idx` identifica la consulta (1-25 mediante comando) y determina el tópico MQTT: `DVL/LILY-GO/<ID_EQUIPO>/MODBUS/<idx>`. Cada consulta genera un mensaje independiente, aunque varias consulten al mismo dispositivo Modbus. El ID del dispositivo es el primer byte de `consulta`; no determina el sufijo del tópico. Esto cambia el significado del tópico respecto del formato anterior por dispositivo.
+
+Configurar o borrar una ranura requiere un `idx` entero válido entre 1 y `MODBUS_MAX_FRAMES` (25). Valores vacíos, fuera de rango o con texto sobrante se rechazan antes de convertirlos a 8 bits; por ejemplo, 257 no modifica la ranura 1. Para borrar todas las consultas se usa exclusivamente `DVL+MODBUSCLR=ALL`; `0` no equivale a `ALL`. Con 25 consultas activas, cada una se repite aproximadamente cada 50 segundos o más según las demás tareas. Se publican 25 mensajes por intervalo, conservando el límite individual offline existente.
+
+Los campos numéricos usan base automática: escribir los decimales sin ceros iniciales, o usar el prefijo `0x` para hexadecimal. Por ejemplo, ocho se escribe `8` o `0x08`; `08` no es válido porque un cero inicial selecciona base octal.
+
+La velocidad de UART2 se configura con `DVL+SBAUD` y se comparte con serial; cambiarla no modifica la paridad Modbus guardada. Modbus usa 8 bits de datos y 1 bit de parada: `NONE` es 8N1, `EVEN` es 8E1 y `ODD` es 8O1. Al habilitar serial se usa 8N1 y al volver a Modbus se aplica su paridad guardada.
+
+El valor inicial de paridad es `NONE` cuando no existe uno guardado. Se aceptan mayúsculas y minúsculas; la consulta siempre devuelve `NONE`, `EVEN` u `ODD`. Un valor inválido devuelve `ERROR: Paridad invalida (NONE, EVEN, ODD)` sin modificar la configuración. Si serial está activo, el comando guarda la paridad Modbus pero serial continúa en 8N1. Tras reiniciar, se recuperan el baud y la paridad guardados y se aplica el formato del modo habilitado.
+
+`DVL+SENVIO_MODBUS` afecta tanto al reporte Modbus por cambio de datos como al periodico por `DVL+STIME`. En `DIRECTO`, si MQTT esta conectado se publica inmediatamente, aun con historicos pendientes; este es el comportamiento previo y el valor por defecto. En `COLA`, si hay cualquier paquete historico pendiente se guarda el nuevo JSON Modbus al final de la cola existente; con la cola vacia y MQTT conectado se publica inmediatamente. Sin MQTT, ambos modos usan la cola existente. El modo se conserva tras reiniciar. No cambia los reportes BLE, serial, ADC, sensores ni keep-alive; tampoco cambia el bloque de descarga de historicos, que sigue pausando las consultas Modbus mientras se ejecuta. Un valor distinto de `COLA` o `DIRECTO` se rechaza sin cambiar la configuracion.
+
+Ejemplo para 4800 baud, paridad EVEN, 8 bits de datos y 1 bit de parada:
+
+```text
+DVL+SBAUD=4800
+DVL+SPARITY_MODBUS=EVEN
+DVL+MODBUS=1,1,3,36,2
+DVL+EN_MODBUS=1
+DVL+QBAUD
+DVL+QPARITY_MODBUS
+DVL+QEN_MODBUS
+DVL+QMODBUS
+```
+
+Las consultas de estado deben mostrar `BAUD=4800`, `PARITY_MODBUS=EVEN` y `EN_MODBUS=1`. Para seleccionar las otras paridades se utiliza `DVL+SPARITY_MODBUS=NONE` o `DVL+SPARITY_MODBUS=ODD`. No se configuran bits de datos o parada mediante estos comandos.
+
+Cuando se cambia y guarda un valor diferente de baud o paridad se limpian las últimas respuestas Modbus de la RAM, incluso si Modbus está deshabilitado. Las consultas configuradas y los mensajes guardados en flash se conservan. Hasta la próxima lectura, los campos de respuesta pueden estar vacíos. Una consulta de estado, un valor inválido o volver a configurar el mismo valor no los limpia.
+
+Cada mensaje MQTT Modbus incluye `baud` (número), `paridad` (`NONE`, `EVEN` u `ODD`), `consulta` (trama TX completa con CRC), `respuesta` (última trama RX válida con CRC), `datos_hexa` (bytes de datos sin espacios ni cabecera ni CRC) y `date_respuesta` (UTC del reloj al recibir esa respuesta). `date` conserva el momento de armado del mensaje. Los datos mantienen el orden de bytes recibido; la conversión específica de cada sensor corresponde al receptor. Se retiran las claves dinámicas `addr...`.
+
+Solo se actualizan respuesta, datos y fecha al validar ID, función, longitud y CRC. Para funciones 05/06 también se verifica el eco de dirección y valor. Ante timeout, trama inválida o excepción se conserva la última lectura válida de esa consulta. Antes de la primera lectura válida, `respuesta`, `datos_hexa` y `date_respuesta` están vacíos. Si al recibir un dato válido el reloj no tiene un año admisible (2024-2099), se guarda el dato con fecha vacía y no se le asigna una fecha después. Las lecturas y sus fechas están en RAM: se limpian al reiniciar, al reconfigurar o borrar la consulta y al cambiar baud o paridad; no se borran los paquetes históricos ya guardados.
+
+Cada consulta publica también al recibir su primera respuesta válida o cuando cambian sus bytes de datos (datos_hexa) respecto de la última respuesta válida de ese idx. Una respuesta igual actualiza date_respuesta sin disparar otro envío; timeout, trama inválida o excepción no disparan el evento. Se conserva el mismo JSON y topic por idx. La publicación periódica por DVL+STIME y el keep-alive siguen independientes. Si el evento no puede publicarse, se intenta encolar en la flash existente, con su límite de 511 bytes por mensaje y su capacidad finita; los paquetes más antiguos pueden sobrescribirse al llenarse la cola. El evento se procesa antes de la siguiente consulta, sin esperar STIME. No se agregan comandos ni se cambia el orden de los datos.
+
+El timeout RX sigue en 200 ms y el polling en una consulta cada 2 s como mínimo. La validación no identifica por sí sola respuestas tardías de lecturas al mismo ID y función con igual longitud pero distinta dirección, porque la respuesta no incluye la dirección inicial. El guardado offline mantiene el límite de 511 bytes de contenido por mensaje; un paquete mayor se rechaza. Los mensajes históricos ya encolados conservan su formato y tópico anteriores.
 
 ---
 

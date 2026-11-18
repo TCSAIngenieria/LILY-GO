@@ -88,17 +88,66 @@ Configura cada cuánto se toma una muestra ADC (multiplicador de 100ms).
 
 Permite definir tramas Modbus para ser consultadas periódicamente.
 
+### Paridad de Modbus
+- `DVL+SPARITY_MODBUS=NONE`, `DVL+SPARITY_MODBUS=EVEN` o `DVL+SPARITY_MODBUS=ODD`: configura la paridad y la guarda. El valor inicial es `NONE`.
+- `DVL+QPARITY_MODBUS`: consulta la paridad guardada; por ejemplo, `PARITY_MODBUS=EVEN`.
+- `DVL+SBAUD=<baud>` cambia la velocidad compartida sin modificar la paridad. Serial común usa 8N1; Modbus usa 8N1, 8E1 o 8O1 según la paridad guardada.
+- `DVL+SENVIO_MODBUS=COLA` o `DVL+SENVIO_MODBUS=DIRECTO`: selecciona y guarda el envio de los reportes Modbus. Por defecto es `DIRECTO`, como antes. En `COLA`, si hay historicos pendientes, los nuevos reportes por cambio y por STIME se agregan al final de la cola existente; con cola vacia se publican directamente si MQTT esta conectado. Sin MQTT se guardan en ambos modos. No cambia la descarga de historicos ni los demas reportes.
+- `DVL+QENVIO_MODBUS`: consulta el modo guardado; responde `ENVIO_MODBUS=COLA` o `ENVIO_MODBUS=DIRECTO`.
+- El MQTT Modbus incluye `baud` y `paridad`. `datos_hexa` conserva el orden de bytes recibido.
+- Si serial está activo, la paridad Modbus se guarda pero serial sigue en 8N1.
+  Al habilitar Modbus se aplica su paridad guardada. Ambos valores se recuperan
+  tras reiniciar. No se agregan comandos para bits de datos o parada.
+- Un valor distinto de NONE/EVEN/ODD se rechaza sin cambiar la configuración.
+
+Ejemplo: 4800 baud, 8E1 (8 bits, EVEN, 1 bit de parada):
+```text
+DVL+SBAUD=4800
+DVL+SPARITY_MODBUS=EVEN
+DVL+MODBUS=1,1,3,36,2
+DVL+EN_MODBUS=1
+DVL+QBAUD
+DVL+QPARITY_MODBUS
+DVL+QMODBUS
+```
+
 ### Configurar Trama
 - **Sintaxis:** `DVL+MODBUS=idx,ID,FUNC,ADDR,QTY`
-  - `idx`: Índice de la trama (1-5).
+  - `idx`: Índice de la trama (1-25).
   - `ID`: ID del esclavo Modbus.
   - `FUNC`: Código de función.
   - `ADDR`: Dirección de memoria inicial.
   - `QTY`: Cantidad de registros.
 - **Ejemplo:** `DVL+MODBUS=1,1,3,100,2` (Trama 1: Esclavo 1, Función 3, Dirección 100, 2 Registros).
+- Usar decimales sin ceros iniciales o hexadecimal con `0x`. La base automática
+  interpreta un cero inicial como octal: ocho se escribe `8` o `0x08`, no `08`.
+
+El primer parámetro (`idx`) identifica la consulta (1-25) y el sufijo del tópico:
+`DVL/LILY-GO/<ID_EQUIPO>/MODBUS/<idx>`. Se publica un mensaje por consulta,
+incluso si varias consultan al mismo ID Modbus. El primer byte de `consulta`
+identifica al dispositivo. El tópico ya no se identifica por el ID del sensor.
+
+`consulta` contiene la trama TX completa con CRC; `respuesta`, la última trama
+RX válida con CRC; `datos_hexa`, solo sus bytes de datos en hexadecimal compacto;
+`date_respuesta`, la fecha UTC del reloj al recibir esa respuesta válida.
+`date` indica cuándo se armó el mensaje MQTT. Se retiran los campos `addr...`.
+Ante timeout, respuesta de otro ID, CRC o longitud inválidos o excepción, se
+conservan la respuesta válida anterior, sus datos y su fecha. Hasta recibir una
+lectura válida, esos tres campos están vacíos. Si el reloj aún no tiene un año
+admisible (2024-2099), el dato se guarda con fecha vacía. La limpieza por cambio
+de consulta, baud o paridad también limpia su fecha; el histórico flash queda.
+Las lecturas están en RAM y no se recuperan después de reiniciar.
+
+Cada consulta publica también al recibir su primera respuesta válida o cuando cambian sus bytes de datos (datos_hexa) respecto de la última respuesta válida de ese idx. Una respuesta igual actualiza date_respuesta sin disparar otro envío; timeout, trama inválida o excepción no disparan el evento. Se conserva el mismo JSON y topic por idx. La publicación periódica por DVL+STIME y el keep-alive siguen independientes. Si el evento no puede publicarse, se intenta encolar en la flash existente, con su límite de 511 bytes por mensaje y su capacidad finita; los paquetes más antiguos pueden sobrescribirse al llenarse la cola. El evento se procesa antes de la siguiente consulta, sin esperar STIME. No se agregan comandos ni se cambia el orden de los datos.
+
+Se mantienen 200 ms de espera, polling de 2 s y el límite de 511 bytes por
+mensaje offline. Los paquetes históricos pendientes mantienen el formato previo.
 
 ### Borrar Trama
 - **Sintaxis:** `DVL+MODBUSCLR=<idx|ALL>`
+- `idx` debe estar entre 1 y 25, tanto para configurar como para borrar. Se
+  valida antes de convertirlo a 8 bits: 0, 26, 257 o texto inválido se rechazan.
+  Solo `ALL` borra todas las consultas.
 - **Ejemplo:** 
   - `DVL+MODBUSCLR=1` (Borra la trama 1).
   - `DVL+MODBUSCLR=ALL` (Borra todas las tramas).
@@ -112,8 +161,10 @@ Estos comandos devuelven el estado actual de las configuraciones.
 | Comando | Retorna (Ejemplo) | Descripción |
 | :--- | :--- | :--- |
 | `DVL+VER` | `VERSION=v1.0` | Versión del firmware. |
-| `DVL+Qtime` | `TIME=60` | Intervalo de publicación. |
-| `DVL+QID` | *(Asumido, si existe)* | Consultar ID (no explícito en código revisado, ver `DVL+ID` para setear). |
+| `DVL+QTIME` | `TIME=60` | Intervalo de publicación. |
+| `DVL+QBAUD` | `BAUD=4800` | Velocidad compartida de UART2. |
+| `DVL+QPARITY_MODBUS` | `PARITY_MODBUS=EVEN` | Paridad Modbus guardada. |
+| `DVL+QENVIO_MODBUS` | `ENVIO_MODBUS=DIRECTO` | Modo de envio Modbus guardado. |
 | `DVL+QLAT` | `LAT=-34.xxx` | Última latitud configurada. |
 | `DVL+QLONG` | `LONG=-58.xxx` | Última longitud configurada. |
 | `DVL+QFINI` | `START_MARKER=DATA,` | Marcador de inicio. |
@@ -123,7 +174,7 @@ Estos comandos devuelven el estado actual de las configuraciones.
 | `DVL+QEN_SERIAL`| `EN_SERIAL=0` | Estado de puerto serial secundario. |
 | `DVL+QEN_MODBUS`| `EN_MODBUS=1` | Estado de Modbus. |
 | `DVL+QEN_BLE` | `EN_BLE=1` | Estado del escaneo y publicacion de sensores BLE. |
-| `DVL+QMODBUS` | `[OK] Ver detalle por Serial` | Imprime configuración Modbus detallada. |
+| `DVL+QMODBUS` | `[OK] MODBUS#1 ID=0x01 FUNC=0x03 ADDR=0x0064 QTY=0x0002` | Lista la configuración Modbus. |
 | `DVL+QFIL` | `FIL0=...` | Configuración de filtros ADC. |
 | `DVL+QFACTOR` | `FAC0=...` | Configuración de factores ADC. |
 | `DVL+QTADC` | `TIME ADC=10` | Tiempo de muestreo ADC. |

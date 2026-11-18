@@ -30,7 +30,8 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
 
 String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
                                String latitud, String longitud, float Vbackup,
-                               float Vprincipal, unsigned long numeroPaquete);
+                               float Vprincipal, unsigned long numeroPaquete,
+                               uint8_t frameIdx);
 
 String create_mqtt_json_ble(String topic, String ident, String fechayhora,
                             const MokoSensorData& data,

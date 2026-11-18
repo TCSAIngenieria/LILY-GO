@@ -22,6 +22,7 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
 #### Conectividad y Protocolos
 - **MQTT:** Protocolo principal para envío de datos y recepción de comandos.
 - **Modo Híbrido:** Prioriza la conexión WiFi cuando está disponible; cambia automáticamente a GPRS en caso contrario.
+- **Diagnóstico WiFi por Serial:** Al conectarse o reconectarse, informa ID LILY, SSID/BSSID, MAC, hostname, IP, máscara, gateway, DNS, canal, RSSI y destino MQTT sin exponer la contraseña.
 - **Buffering (Flash):** Almacenamiento temporal de paquetes en memoria SPIFFS/LittleFS ante cortes de conexión para evitar pérdida de datos.
 
 #### Sensores e Interfaces
@@ -30,19 +31,25 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
   - Configuración de filtros (umbral mínimo), factores de calibración (pendiente/offset) y alisado (promedio móvil).
 - **Modbus RTU (RS485):**
   - Maestro Modbus para interrogar dispositivos esclavos industriales.
-  - Configuración dinámica de tramas de consulta (ID, Función, Dirección, Cantidad).
+  - Hasta 25 consultas configurables por idx (ID del dispositivo, Función, Dirección y Cantidad), ejecutadas de una en una cada 2 segundos como mínimo, con 200 ms de espera por respuesta.
+  - Cada consulta publica también al recibir su primera respuesta válida o cuando cambian sus bytes de datos (datos_hexa) respecto de la última respuesta válida de ese idx. Una respuesta igual actualiza date_respuesta sin disparar otro envío; timeout, trama inválida o excepción no disparan el evento. Se conserva el mismo JSON y topic por idx. La publicación periódica por DVL+STIME y el keep-alive siguen independientes. Si el evento no puede publicarse, se intenta encolar en la flash existente, con su límite de 511 bytes por mensaje y su capacidad finita; los paquetes más antiguos pueden sobrescribirse al llenarse la cola. El evento se procesa antes de la siguiente consulta, sin esperar STIME. No se agregan comandos ni se cambia el orden de los datos.
+  - Publicación MQTT independiente por idx de consulta, incluso si varias consultan al mismo dispositivo o son idénticas.
+  - Campos `consulta`, `respuesta`, `datos_hexa` y `date_respuesta`: TX completa, última RX válida, datos compactos sin cabecera ni CRC y fecha UTC de recepción. `date` indica cuándo se armó el mensaje. La conversión de los bytes corresponde a la plataforma.
+  - Ante una consulta fallida conserva la última lectura válida. Lecturas y fechas están en RAM; se limpian al reiniciar, reconfigurar o borrar la consulta y al cambiar baud/paridad, sin borrar los mensajes históricos en flash.
+  - Paridad persistente NONE/EVEN/ODD mediante `DVL+SPARITY_MODBUS` y `DVL+QPARITY_MODBUS`; baud compartido mediante `DVL+SBAUD` y `DVL+QBAUD`. Cambiar uno conserva el otro. Serial común usa 8N1; Modbus usa el formato guardado (8N1/8E1/8O1).
 - **Sensores Dedicados:** Soporte nativo para sensor de temperatura DS18B20.
 - **Expansora I/O:** Comunicación con placas expansoras vía puerto serial secundario.
 
 #### Gestión del Dispositivo
 - **Modo AP (Access Point):** Servidor web integrado para configuración inicial (WiFi, parámetros MQTT) activable mediante botón físico.
-- **Comandos Seriales/Remotos:** Interfaz de línea de comandos (CLI) completa para configuración en tiempo real (ver `comandos.MD`).
+- **Comandos Seriales/Remotos:** Interfaz de línea de comandos (CLI) para configuración en tiempo real (ver `main/COMANDOS.md` y `comandos.txt`).
 - **FOTA:** Actualización de firmware vía HTTP.
 - **Watchdog:** Mecanismos de reinicio automático ante fallos de software o módem.
 
 ## 4. Arquitectura de Datos
 El sistema reporta datos en formato JSON a través de tópicos MQTT específicos:
-- `DVL/LILY-GO/<ID>`: Tópico principal de telemetría.
-- `DVL/LILY-GO/<ID>/ADC`: Reportes específicos de entradas analógicas.
+- `DVL/LILY-GO/<ID_LILY>`: Tópico principal de telemetría.
+- `DVL/LILY-GO/<ID_LILY>/ADC`: Reportes específicos de entradas analógicas.
+- `DVL/LILY-GO/<ID_LILY>/MODBUS/<idx>`: Reportes Modbus separados por consulta (idx 1-25), con `baud` y `paridad`. El ID del dispositivo está en el primer byte de la trama `consulta`.
 
 Los paquetes incluyen timestamp, ubicación, e información de sensores según la configuración habilitada (`EN_SENSOR`, `EN_SERIAL`, `EN_MODBUS`).
