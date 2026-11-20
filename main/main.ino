@@ -53,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.01";
+String versionado = "V07.19.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -140,6 +140,7 @@ unsigned long startAttemptTime = millis();
 unsigned long lastPublish = 0;
 extern unsigned long publishInterval; // intervalo de publicacion del dato //60
                                       // segundos por default//
+extern unsigned long keepAliveInterval; // intervalo de publicacion de keep-alive // 300 seg por default
 unsigned long lastReconnectAttempt = 0;
 
 /*BOToN MODO AP*/
@@ -883,7 +884,7 @@ void loop() {
   }
 
   // Keep Alive si no hay datos para transmitir
-  if (now - lastNoDataMessage > 5000) {
+  if (now - lastNoDataMessage >= keepAliveInterval * 1000UL) {
     String cType = "NO_CONECTADO";
     String cDetail = "N/A";
     String rsrq = "N/A";

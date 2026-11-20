@@ -41,6 +41,7 @@ uint en_modem;
 uint en_gps;
 
 extern unsigned long publishInterval;
+extern unsigned long keepAliveInterval;
 extern FOTAClass FOTA;
 uint32_t serialBaud = 4800;
 uint en_wifi;
@@ -153,6 +154,17 @@ String procesarComando(String comando) {
     guardar_en_flash("time", publishInterval_s);
     publishInterval = strtoul(publishInterval_s.c_str(), NULL, 10);
     respuesta = "TIEMPO SETEADO OK";
+
+  } else if (comando.startsWith("DVL+SKA=")) {
+    String ka_s = comando.substring(8);
+    unsigned long val = strtoul(ka_s.c_str(), NULL, 10);
+    if (val > 0) {
+      guardar_en_flash("ka_time", ka_s);
+      keepAliveInterval = val;
+      respuesta = "KEEP ALIVE SETEADO OK";
+    } else {
+      respuesta = "[ERR] Intervalo Keep Alive invalido (debe ser > 0 segundos)";
+    }
 
   } else if (comando.startsWith("DVL+SBAUD=")) {
     unsigned long val = strtoul(comando.substring(10).c_str(), NULL, 10);
@@ -621,6 +633,9 @@ String procesarComando(String comando) {
     /*COMANDOS DE CONSULTA*/
   } else if (comando == "DVL+QTIME") {
     respuesta = "TIME=" + String(publishInterval);
+
+  } else if (comando == "DVL+QKA") {
+    respuesta = "KEEP_ALIVE=" + String(keepAliveInterval);
 
   } else if (comando == "DVL+QFINI") {
     respuesta = "START_MARKER=" + startMarker;
