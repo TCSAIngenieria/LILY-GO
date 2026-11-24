@@ -53,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.05";
+String versionado = "V07.19.06";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -792,10 +792,10 @@ void loop() {
       DVL_PRINT("Serial habilitado. Enviando dato por MQTT...");
 
       String topicSerial = topic1 + "/SERIAL";
-  topicSerial.toUpperCase();
+      topicSerial.toUpperCase();
 
       String jsonserial = create_mqtt_json_serial(
-          topic1, ident, sensorValues[0], sensorValues[1], sensorValues[2],
+          topicSerial, ident, sensorValues[0], sensorValues[1], sensorValues[2],
           sensorValues[3], sensorValues[4], sensorValues[5], sensorValues[6],
           sensorValues[7], sensorValues[8], sensorValues[9], sensorValues[10],
           sensorValues[11], sensorValues[12], sensorValues[13],

@@ -161,7 +161,7 @@ Estos comandos devuelven el estado actual de las configuraciones.
 
 | Comando | Retorna (Ejemplo) | Descripción |
 | :--- | :--- | :--- |
-| `DVL+VER` | `VERSION=V07.19.05` | Versión del firmware. |
+| `DVL+VER` | `VERSION=V07.19.06` | Versión del firmware. |
 | `DVL+QTIME` | `TIME=60` | Intervalo de publicación. |
 | `DVL+QKA` | `KEEP_ALIVE=300` | Intervalo de publicación de la trama Keep Alive (segundos). |
 | `DVL+QEVT=<id>` | `EV0=1,VPRIN,<,11.50,30,MQTT,ONESHOT` | Configuración de la regla de evento `<id>` (`0..3`). |
