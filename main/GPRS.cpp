@@ -1,6 +1,7 @@
 #include "GPRS.h"
 #include "Debug.h"
 #include "ClockSync.h"
+#include "esp_task_wdt.h"
 #include <PubSubClient.h>
 #include <time.h>
 #include <sys/time.h>
@@ -27,6 +28,7 @@ static unsigned long modeWindowStart = 0;
 static unsigned long lastCheckConnected = 0;
 static int initFailCount = 0;
 static int failedFullCycles = 0;
+static int noAtResponseCount = 0;
 
 const unsigned long checkInterval = 3000;       // Sondeo de registro cada 3 segundos
 const unsigned long modeWindowTimeout = 45000;  // 45 segundos de espera por tecnologia antes de rotar
@@ -179,6 +181,7 @@ void forceModemTechReconfig() {
   lastConnectAttempt = 0;
   modeWindowStart = 0;
   failedFullCycles = 0;
+  noAtResponseCount = 0;
   mqtt.disconnect();
   if (modemTechMode == 1) currentModeIndex = 0;
   else if (modemTechMode == 2) currentModeIndex = 1;
@@ -195,6 +198,7 @@ void notifyModemReset() {
   activeTechDetected = "";
   lastConnectAttempt = 0;
   modeWindowStart = 0;
+  noAtResponseCount = 0;
   mqtt.disconnect();
 }
 
@@ -307,16 +311,62 @@ void modemPowerOff() {
   digitalWrite(PWR_PIN, LOW);
 }
 
+static bool waitModemPowerOff(unsigned long timeoutMs) {
+  unsigned long start = millis();
+  unsigned long lastProbe = 0;
+  String rxBuf = "";
+
+  while (millis() - start < timeoutMs) {
+    while (modemStream.available()) {
+      char c = modemStream.read();
+      rxBuf += c;
+      if (rxBuf.length() > 160) {
+        rxBuf = rxBuf.substring(rxBuf.length() - 80);
+      }
+      if (rxBuf.indexOf("NORMAL POWER DOWN") != -1) {
+        DVL_PRINTLN("[MODEM] Confirmado URC NORMAL POWER DOWN.");
+        return true;
+      }
+    }
+
+    // Tras 1500 ms del pulso de apagado, verificar cada 1 s si ya dejo de responder AT
+    if (millis() - start >= 1500 && millis() - lastProbe >= 1000) {
+      lastProbe = millis();
+      esp_task_wdt_reset();
+      if (!isModemOn()) {
+        DVL_PRINTLN("[MODEM] Apagado fisico confirmado (sin respuesta AT).");
+        return true;
+      }
+    }
+    delay(50);
+  }
+  return !isModemOn();
+}
+
 void modemRestart() {
   DVL_PRINTLN("[MODEM] Iniciando reinicio de hardware...");
+  esp_task_wdt_reset();
   if (isModemOn()) {
     DVL_PRINTLN("[MODEM] Apagando modem...");
     modemPowerOff();
-    delay(2000);
+    bool poweredOff = waitModemPowerOff(12000);
+    if (!poweredOff) {
+      DVL_PRINTLN("[MODEM] Sigue respondiendo tras PWR_PIN. Intentando apagado por AT+CPOWD=1...");
+      SerialAT.println("AT+CPOWD=1");
+      poweredOff = waitModemPowerOff(8000);
+    }
+    if (poweredOff) {
+      // Datasheet SIM7000G: esperar reposo minimo (~2s) entre apagado y re-encendido
+      delay(2000);
+    } else {
+      DVL_PRINTLN("[MODEM] ALERTA: No se pudo confirmar apagado fisico del modem.");
+    }
   } else {
     DVL_PRINTLN("[MODEM] El modem no respondia, omitiendo apagado seguro.");
   }
+  esp_task_wdt_reset();
   asegurarModemEncendido();
+  esp_task_wdt_reset();
   notifyModemReset();
 }
 
@@ -360,10 +410,11 @@ void asegurarModemEncendido() {
 
   DVL_PRINTLN("[MODEM] El modem no responde. Intentando encender (Toggle 1)...");
   modemPowerOn();
+  delay(2000);  // Tiempo minimo de arranque del SIM7000G antes del primer sondeo AT
 
-  // Esperar a que arranque y verificar
+  // Esperar hasta 10s adicionales a que inicialice la UART (arranque en frio ~5-8s)
   unsigned long start = millis();
-  while (millis() - start < 5000) {
+  while (millis() - start < 10000) {
     if (isModemOn()) {
       DVL_PRINTLN("[MODEM] Modem encendido exitosamente (Toggle 1).");
       return;
@@ -371,11 +422,12 @@ void asegurarModemEncendido() {
     delay(500);
   }
 
-  DVL_PRINTLN("[MODEM] Sigue sin responder. Posiblemente estaba encendido pero colgado y el primer Toggle lo apago. Intentando Toggle 2...");
+  DVL_PRINTLN("[MODEM] Sigue sin responder tras 12s. Posiblemente estaba encendido pero colgado y el primer Toggle lo apago. Intentando Toggle 2...");
   modemPowerOn();
+  delay(2000);
 
   start = millis();
-  while (millis() - start < 5000) {
+  while (millis() - start < 10000) {
     if (isModemOn()) {
       DVL_PRINTLN("[MODEM] Modem encendido exitosamente (Toggle 2).");
       return;
@@ -509,11 +561,17 @@ void updateNetworkConnection(TinyGsm &modem) {
   if (!modeConfigured) {
     DVL_PRINTF("[MODEM] Configurando tecnologia: %s (ventana de busqueda: %lu s)...\n",
                getGSMTech().c_str(), modeWindowTimeout / 1000);
-    applyModemRadioTech(modem, currentModeIndex);
+    bool techOk = applyModemRadioTech(modem, currentModeIndex);
+    if (!techOk && !isModemOn()) {
+      DVL_PRINTLN("[MODEM] Sin respuesta AT al configurar tecnologia (posiblemente apagado). Recuperando modem...");
+      modemRestart();
+      return;
+    }
     preconfigureModemAPN(modem, apn);
     modeConfigured = true;
     modeWindowStart = millis();
     lastConnectAttempt = millis();
+    noAtResponseCount = 0;
     return;
   }
 
@@ -528,6 +586,23 @@ void updateNetworkConnection(TinyGsm &modem) {
   unsigned long totalWindowSec = modeWindowTimeout / 1000;
 
   isModemConnected = modem.isNetworkConnected();
+
+  if (!isModemConnected) {
+    if (!isModemOn()) {
+      noAtResponseCount++;
+      DVL_PRINTF("[MODEM] ALERTA: Sin respuesta AT durante busqueda (%d/3)\n", noAtResponseCount);
+      if (noAtResponseCount >= 3) {
+        DVL_PRINTLN("[MODEM] Modem sin respuesta AT (apagado o bloqueado). Ejecutando recuperacion inmediata...");
+        noAtResponseCount = 0;
+        modemRestart();
+        return;
+      }
+    } else {
+      noAtResponseCount = 0;
+    }
+  } else {
+    noAtResponseCount = 0;
+  }
 
   if (modemDebugLevel >= 1) {
     int16_t csq = modem.getSignalQuality();

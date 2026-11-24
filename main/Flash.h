@@ -21,6 +21,7 @@ bool flash_buffer_empty();
 extern String ultimaLat;
 extern String ultimaLon;
 extern String apn;
+extern unsigned long keepAliveInterval;
 
 // Guarda un paquete JSON en el buffer flash (no bloqueante)
 bool flash_save_packet(const char* json);

@@ -28,6 +28,7 @@
 #include "GPRS.h"
 #include "MQTT.h"
 #include "Modbus.h"
+#include "MotorEventos.h"
 #include "SerialSecundario.h"
 #include "TensionAlimentacion.h"
 #include "WebServerConfig.h"
@@ -52,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.00";
+String versionado = "V07.19.05";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -131,6 +132,7 @@ unsigned long startAttemptTime = millis();
 unsigned long lastPublish = 0;
 extern unsigned long publishInterval; // intervalo de publicacion del dato //60
                                       // segundos por default//
+extern unsigned long keepAliveInterval; // intervalo de publicacion de keep-alive // 300 seg por default
 unsigned long lastReconnectAttempt = 0;
 
 /*BOToN MODO AP*/
@@ -323,6 +325,7 @@ void setup() {
   flash_init();
   initADC();
   initTensionAlimentacion();
+  initMotorEventos();
 
   // Inicializacion del sensor
   sensor->begin();
@@ -398,10 +401,14 @@ void setup() {
 void loop() {
 
   mqtt.loop();
+  if (mqtt.connected()) {
+    mqttUltimaConexionOK = millis();
+  }
   unsigned long now = millis();
   static unsigned long unahora = 0;
   static int activeMqttClient = 0; // 0=ninguno, 1=WiFi, 2=GPRS
   static unsigned long lastNoDataMessage = 0;
+  static bool firstKeepAliveSent = false;
   static unsigned long last_10ms_event = 0;
   static unsigned long last_100ms_event = 0;
   static unsigned long last_1s_event = 0;
@@ -412,6 +419,15 @@ void loop() {
   }
 
   if (now - last_100ms_event >= 100) {
+    static float vPrinActual = 0.0f;
+    static float vBackActual = 0.0f;
+    static unsigned long lastTensionRead = 0;
+    if (now - lastTensionRead >= 500 || lastTensionRead == 0) {
+      lastTensionRead = now;
+      vPrinActual = leer_tension_principal();
+      vBackActual = leer_tension_backup();
+    }
+    procesarMotorEventos(vPrinActual, vBackActual, ADCValue[0], ADCValue[1]);
     last_100ms_event = now;
     if (++cADC >= tADC) {
       procesarADC(ADCValue);
@@ -482,9 +498,9 @@ void loop() {
           delay(10); // pequeño delay para no saturar CPU
         }
 
-        // Apagamos GPS y reiniciamos modem antes de pasar a fase de datos
+        // Apagamos GPS antes de pasar a fase de datos (sin reiniciar hardware del modem)
         disableGPS();
-        modemRestart();
+        delay(500);
       } else {
         DVL_PRINTLN("[GPS] Omitido (EN_GPS=0). Iniciando modem directamente para conexion celular...");
       }
@@ -638,6 +654,14 @@ void loop() {
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
+        // Alimentar motor de eventos con telemetria BLE indexada por MAC
+        float bTemp = (bleData.temperature != 0.0f) ? bleData.temperature : 0.0f;
+        float bHum  = (bleData.humidity != 0.0f) ? bleData.humidity : 0.0f;
+        float bDoor = bleData.hasDoorOpen ? (bleData.doorOpen ? 1.0f : 0.0f) : (float)bleData.door;
+        float bMov  = bleData.hasMotionStatus ? (float)bleData.motion : (bleData.hasPirRaw ? (float)bleData.pirRaw : 0.0f);
+        float bBat  = (float)bleData.batteryLevel;
+        actualizarDatosBLE(bleData.mac, bTemp, bHum, bDoor, bMov, bBat);
+
         // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
   topicBLE.toUpperCase();
@@ -856,8 +880,10 @@ void loop() {
     esp_task_wdt_reset();
   }
 
-  // Keep Alive si no hay datos para transmitir
-  if (now - lastNoDataMessage > 5000) {
+  // Keep Alive: envio inmediato al conectar por primera vez a MQTT y luego cada keepAliveInterval segundos
+  bool dueInitialKA = (!firstKeepAliveSent && mqtt.connected());
+  bool duePeriodicKA = (now - lastNoDataMessage >= keepAliveInterval * 1000UL);
+  if (dueInitialKA || duePeriodicKA) {
     String cType = "NO_CONECTADO";
     String cDetail = "N/A";
     String rsrq = "N/A";
@@ -893,7 +919,9 @@ void loop() {
           topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
           rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
           rsrp, rssi, leer_tension_backup(), leer_tension_principal());
-      publish_mqtt_json(topic1, jsonKeepAlive);
+      if (publish_mqtt_json(topic1, jsonKeepAlive)) {
+        firstKeepAliveSent = true;
+      }
     } else if (modemDebugLevel >= 1) {
       DVL_PRINTLN("[MQTT-DBG] Keep-Alive omitido: esperando conexion activa al broker MQTT...");
     }
@@ -950,7 +978,8 @@ void loop() {
     mantenerBridgeAP();
   }
   actualizarLED();
-  esp_task_wdt_reset(); // Alimenta el WDT
+  esp_task_wdt_reset(); // Alimenta el WDT de loopTask
+  vTaskDelay(1);        // Cede CPU 1 a IDLE1 para alimentar su WDT y evitar busy-wait al 100%
 }
 
 void actualizarLED() {

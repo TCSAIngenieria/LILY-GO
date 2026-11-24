@@ -16,6 +16,8 @@ extern String ident;
 
 String spublishInterval;
 unsigned long publishInterval = 60;
+String skeepAliveInterval;
+unsigned long keepAliveInterval = 300;
 
 /*MEMORIA CIRCULAR*/
 static int writeIndex = 0;
@@ -30,11 +32,18 @@ void lectura_flash() {
   ultimaLat = leer_de_flash("lat");
   ultimaLon = leer_de_flash("lon");
   spublishInterval = leer_de_flash("time");
+  skeepAliveInterval = leer_de_flash("ka_time", "300");
   apn = leer_de_flash("apn", "igprs.claro.com.ar");
   if (spublishInterval != "N/A" && spublishInterval.length() > 0) {
     unsigned long temp = strtoul(spublishInterval.c_str(), NULL, 10);
     if (temp > 0) {
       publishInterval = temp;
+    }
+  }
+  if (skeepAliveInterval != "N/A" && skeepAliveInterval.length() > 0) {
+    unsigned long tempKA = strtoul(skeepAliveInterval.c_str(), NULL, 10);
+    if (tempKA > 0) {
+      keepAliveInterval = tempKA;
     }
   }
 
@@ -46,7 +55,10 @@ void lectura_flash() {
   DVL_PRINTLN(apn);
   DVL_PRINT("ultima ultimo publish_time guardado: ");
   DVL_PRINTLN(spublishInterval);
-  DVL_PRINT(publishInterval);
+  DVL_PRINTLN(publishInterval);
+  DVL_PRINT("ultimo keep_alive_time guardado: ");
+  DVL_PRINTLN(skeepAliveInterval);
+  DVL_PRINTLN(keepAliveInterval);
 }
 
 void guardar_en_flash(const String& clave, const String& valor) {

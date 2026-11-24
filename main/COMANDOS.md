@@ -10,7 +10,9 @@ Todos los comandos descriptos en este documento pueden ejecutarse de manera indi
 2. **Broker MQTT Remoto (Tópico de Comandos):**
     * **Tópico de Suscripción (Entrada):** `DVL/LILY-GO/<ID>/COMANDOS` (ej. `DVL/LILY-GO/60000/COMANDOS`).
     * **Tópico de Publicación (Respuesta):** `DVL/LILY-GO/<ID>/RESPUESTA` (ej. `DVL/LILY-GO/60000/RESPUESTA`).
-3. **Retransmisión a Satélites (Modo Gateway AP Bridge / Serial Bridge):**
+3. **Tópicos de Telemetría y Alertas Inmediatas:**
+    * **Reporte de Eventos (Micro-PLC):** `DVL/LILY-GO/<ID>/EVENTOS` (`status: "event-triggered"`, `event_id`, `src`, `val`, `op`, `threshold`, `ton`, `action`).
+4. **Retransmisión a Satélites (Modo Gateway AP Bridge / Serial Bridge):**
     * Cuando el equipo opera como Hub Central (`DVL+EN_WIFI=2` o `DVL+EN_SERIAL=2`), se suscribe a los tópicos comodín `DVL/+/+/COMANDOS` y `DVL/+/+/FOTA`, encolando y entregando automáticamente los comandos dirigidos a los nodos satélites asociados.
 
 ---
@@ -20,10 +22,12 @@ Todos los comandos descriptos en este documento pueden ejecutarse de manera indi
 | Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
 |:---|:---|:---|:---|
 | `DVL+ID=<id>` | Define el identificador único del equipo en Flash NVM, actualiza el tópico raíz a `DVL/LILY-GO/<id>` y fuerza la reconexión al Broker MQTT. | `DVL+ID=60001` | `Rident_OK (TOPIC: DVL/LILY-GO/60001)` |
-| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.00` |
+| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.05` |
 | `DVL+RESET` | Ejecuta un reinicio inmediato por software del microcontrolador ESP32 (`ESP.restart()`). | `DVL+RESET` | `>> Reiniciando dispositivo...` |
 | `DVL+STIME=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de telemetría de sensores (en segundos). | `DVL+STIME=60` | `TIEMPO SETEADO OK` |
 | `DVL+QTIME` | Consulta el intervalo de publicación de telemetría configurado actualmente. | `DVL+QTIME` | `TIME=60` |
+| `DVL+SKA=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de la trama Keep Alive (en segundos, por defecto 300s; al arrancar envía una primera trama inmediata al conectar a MQTT). | `DVL+SKA=300` | `KEEP ALIVE SETEADO OK` |
+| `DVL+QKA` | Consulta el intervalo de publicación de la trama Keep Alive configurado actualmente. | `DVL+QKA` | `KEEP_ALIVE=300` |
 | `DVL+FOTA=<url>` | Inicia una actualización remota de firmware (FOTA) descargando el binario desde la URL indicada (soporta WiFi o GPRS según la interfaz activa). | `DVL+FOTA=http://servidor.com/fw/iot_lite_v071800.bin` | `FOTA_INICIADA` |
 | `DVL+CFG_FOTA=<t>,<sec>` | Configura los parámetros de descarga FOTA en NVM:<br>• `<t>`: Timeout máximo en segundos (`> 0`).<br>• `<sec>`: Protocolo (`0` = HTTP estándar, `1` = HTTPS seguro). | `DVL+CFG_FOTA=600,0` | `>> FOTA CONFIGURADO: TIMEOUT=600s, SEGURIDAD=0` |
 | `DVL+QCFG_FOTA` | Consulta los parámetros actuales de timeout y seguridad configurados para FOTA. | `DVL+QCFG_FOTA` | `TIMEOUT=600 \| SECURE=0` |
@@ -197,3 +201,101 @@ El timeout RX sigue en 200 ms y el polling en una consulta cada 2 s como mínimo
 | `DVL+QALI` | Consulta la cantidad de muestras de alisado configurada actualmente. | `DVL+QALI` | `ALISADO=50` |
 | `DVL+STADC=<ciclos>` | Define el período de muestreo de `GPIO34` y `GPIO39` en múltiplos de `100 ms` (rango válido: `1` a `65000`, ej. `10` = `1000 ms`). | `DVL+STADC=10` | `TIME ADC SETEADO OK` |
 | `DVL+QTADC` | Consulta el divisor de tiempo de muestreo ADC configurado. | `DVL+QTADC` | `TIME ADC=10` |
+
+---
+
+## 9. Motor de Eventos Programable (Micro-PLC)
+
+El equipo dispone de un motor interno de **4 reglas determinísticas** (`EV0` a `EV3`), evaluadas cada 100 ms en segundo plano. Cada regla implementa un bloque de control tipo PLC con temporizador de confirmación continua (**TON - Timer On-Delay**), accionamiento de hardware y emisión inmediata de alertas MQTT en el subtópico `DVL/LILY-GO/<id>/EVENTOS`.
+
+### Formato de Configuración (`DVL+SEVT`)
+```text
+DVL+SEVT=<id>,<en>,<fuente>,<operador>,<umbral>,<ton_seg>,<accion>,<modo>
+```
+* **`<id>`:** Identificador de la regla (`0` a `3`).
+* **`<en>`:** Habilitación (`1` = Activa, `0` = Inactiva). Para borrar/apagar una regla basta con `DVL+SEVT=<id>,0`.
+* **`<fuente>`:** Variable monitoreada por la regla:
+  * **Alimentación y Analógicos:**
+    * `VPRIN`: Tensión de alimentación principal (`GPIO36 / SOLAR_IN`, en Voltios).
+    * `VBACK`: Tensión de batería / backup (`GPIO35 / VVBAT`, en Voltios).
+    * `ADC0`: Canal analógico general 0 (`GPIO34`, en Voltios).
+    * `ADC1`: Canal analógico general 1 (`GPIO39`, en Voltios).
+  * **Entradas Digitales y Conectividad:**
+    * `DI1`: Entrada digital 1 (`GPIO13`, `1` = abierto/HIGH por pull-up, `0` = cerrado a masa).
+    * `DI2`: Entrada digital 2 (`GPIO14`, `1` = abierto/HIGH por pull-up, `0` = cerrado a masa).
+    * `COMM`: Estado de conexión al Broker MQTT (`1` = conectado, `0` = desconectado).
+  * **Sensores Físicos e Industriales Cableados:**
+    * `TEMP`: Temperatura del sensor OneWire DS18B20 (en °C).
+    * `S0` a `S15`: Canales de entrada de la placa expansora serial (lecturas de sensores de campo).
+  * **Sensores Inalámbricos BLE (MOKO):**
+    * `BLE_DOOR[:<mac>]`: Sensor magnético de apertura (`1` = abierto, `0` = cerrado).
+    * `BLE_MOV[:<mac>]`: Sensor PIR / Movimiento (`1` = movimiento detectado, `0` = reposo).
+    * `BLE_TEMP[:<mac>]`: Temperatura ambiental transmitida por baliza BLE (en °C).
+    * `BLE_HUM[:<mac>]`: Humedad relativa ambiental BLE (en % HR).
+    * `BLE_BAT[:<mac>]`: Nivel de batería de la baliza BLE (en %).
+    > **Identificación de Sensor BLE (`:<mac>`):** En instalaciones con múltiples balizas BLE recibidas simultáneamente, se puede especificar la dirección MAC del sensor deseado separada por dos puntos (ej. `BLE_TEMP:D47DA699A56B` o usando los últimos 4 caracteres `BLE_TEMP:A56B`). Si se omite la MAC (ej. `BLE_TEMP`), la regla evaluará la última baliza recibida en el sistema (modo genérico).
+  * **Salud y Diagnóstico del Hardware (ESP32):**
+    * `TEMP_MCU`: Temperatura interna del silicio ESP32 (en °C, vía sensor integrado).
+    * `HEAP`: Memoria RAM libre del sistema (en bytes, monitoreo de fuga de memoria).
+    * `BTN`: Pulsador físico local en placa `IO0` (`0` = presionado, `1` = suelto por pull-up).
+  * **Disparadores Programables por Fecha y Hora (4 índices):**
+    * `DT0` a `DT3` (alias aceptados: `TIME0`..`TIME3`, `DATE0`..`DATE3`): Variables horarias configurables mediante el comando `DVL+SDT=<0..3>,<fecha_hora>`. Valen `1` cuando el reloj interno sincronizado del equipo (RTC/NTP/GPRS) coincide con la programación del índice correspondiente, y `0` fuera de ese horario.
+    > **Formatos admitidos en `DVL+SDT`:**<br>• **Fecha y hora puntual:** `YYYY-MM-DD HH:MM:SS` o `YYYY-MM-DD HH:MM` (ej. `2026-11-20 14:30:00`).<br>• **Horario diario recurrente:** `HH:MM:SS` o `HH:MM` (ej. `08:00:00`, equivale a `*-*-* 08:00:00`).<br>• **Comodines por campo (`*`):** Se admite `*` en cualquier campo `YYYY`, `MM`, `DD`, `HH`, `MM`, `SS` (ej. `*-*-01 12:00:00` para el día 1 de cada mes a las 12:00 hs).<br>• **Deshabilitar índice:** `DVL+SDT=<0..3>,0` o `OFF`.
+* **`<operador>`:** Comparación matemática: `>`, `<`, `>=`, `<=`, `==`, `!=`.
+* **`<umbral>`:** Valor numérico de comparación (ej. `11.5`, `2.80`, `1`, `0`).
+* **`<ton_seg>`:** Temporizador TON en segundos (`0` a `86400`). Tiempo continuo que la condición debe cumplirse para validar el disparo (filtra transitorios y ruidos).
+* **`<accion>`:** Comportamiento ante el disparo:
+  * `MQTT`: Publicación exclusiva de alerta JSON en `DVL/LILY-GO/<id>/EVENTOS` (si no hay red, guarda en Flash SPIFFS).
+  * `OUT:<pin>:HIGH`: Activa y enclava en nivel alto el pin GPIO especificado (ej. `OUT:15:HIGH`).
+  * `OUT:<pin>:LOW`: Desactiva el pin GPIO especificado (ej. `OUT:15:LOW`).
+  * `OUT:<pin>:PULSE:<seg>`: Emite un pulso activo temporizado en el pin indicado y lo apaga automáticamente al vencer (ej. `OUT:15:PULSE:30`).
+  * `CYCLE_PWR`: Cicla por 1 segundo la energía de sensores/expansora en `SENSOR_POWER_PIN` (`GPIO23`).
+  * `RESTART`: Publica la alerta y reinicia el microcontrolador.
+* **`<modo>`:** Política de rearme:
+  * `ONESHOT`: Dispara una única vez; no vuelve a alertar hasta que la variable retorne a valores normales.
+  * `REPEAT:<seg>`: Si la condición anormal persiste, retransmite la alerta periódicamente cada `<seg>` segundos (ej. `REPEAT:300`).
+
+| Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
+|:---|:---|:---|:---|
+| `DVL+SEVT=<id>,<en>,<src>,<op>,<th>,<ton>,<act>,<trg>` | Programa y persiste en Flash NVM una de las 4 reglas del motor de eventos (o `DVL+SEVT=<id>,0` para deshabilitar). | `DVL+SEVT=0,1,VPRIN,<,11.5,30,MQTT,ONESHOT` | `>> EVENTO EV0 CONFIGURADO OK` |
+| `DVL+QEVT=<id>` | Consulta la configuración completa de la regla `<id>` (`0` a `3`). | `DVL+QEVT=0` | `EV0=1,VPRIN,<,11.50,30,MQTT,ONESHOT` |
+| `DVL+SDT=<id>,<fecha_hora\|0>` | Configura y persiste en Flash NVM el disparador de fecha y hora `<id>` (`0` a `3`), aceptando fecha completa (`YYYY-MM-DD HH:MM:SS`), hora diaria (`HH:MM:SS`), comodines (`*`) o `0` para desactivar. | `DVL+SDT=0,2026-11-20 08:30:00`<br>`DVL+SDT=1,03:00:00` | `>> DISPARADOR DT0 CONFIGURADO OK (DT0=2026-11-20 08:30:00 (ESTADO=0))` |
+| `DVL+QDT=<id>` | Consulta la programación y el estado actual (`0` o `1`) del disparador horario `<id>` (`0` a `3`). | `DVL+QDT=0` | `DT0=2026-11-20 08:30:00 (ESTADO=0)` |
+| `DVL+QDT` | Lista la hora actual del reloj interno (`RTC`) y la programación de los 4 índices (`DT0` a `DT3`). | `DVL+QDT` | `RTC=2026-11-18 14:00:00`<br>`DT0=2026-11-20 08:30:00 (ESTADO=0)`... |
+| `DVL+EVT_STATUS` | Imprime por consola serial el estado en tiempo real de las 4 reglas (`EV0`..`EV3`) y de los 4 disparadores de fecha/hora (`DT0`..`DT3`). | `DVL+EVT_STATUS` | *(Ver bloque de ejemplo debajo)* |
+
+### Ejemplos Prácticos de Automatización
+
+1. **Alerta de Intrusión por Sensor Magnético BLE Específico:** Si la puerta monitoreada por el sensor con MAC `F074BFF03C91` permanece abierta (`BLE_DOOR:F074BFF03C91 == 1`) por más de 5 segundos, activar una sirena/relé en `GPIO15` durante 30 segundos y enviar alerta MQTT:
+   ```text
+   DVL+SEVT=0,1,BLE_DOOR:F074BFF03C91,==,1,5,OUT:15:PULSE:30,ONESHOT
+   ```
+2. **Control de Temperatura en Baliza BLE Específica:** Si la temperatura ambiental medida por el sensor BLE `D47DA699A56B` supera los 28 °C continuamente durante 10 segundos, emitir alerta inmediata por MQTT y repetir cada 5 minutos:
+   ```text
+   DVL+SEVT=1,1,BLE_TEMP:D47DA699A56B,>,28.0,10,MQTT,REPEAT:300
+   ```
+3. **Accionamiento Programado por Fecha y Hora (`DT0`):** Programar el índice `DT0` para ejecutarse todos los días a las `08:00:00` y activar una salida en `GPIO15` durante 20 segundos:
+   ```text
+   DVL+SDT=0,08:00:00
+   DVL+SEVT=2,1,DT0,==,1,0,OUT:15:PULSE:20,ONESHOT
+   ```
+4. **Corte de Energía Principal:** Si la alimentación cae por debajo de 11.5 V durante más de 30 segundos, notificar por MQTT:
+   ```text
+   DVL+SEVT=3,1,VPRIN,<,11.5,30,MQTT,ONESHOT
+   ```
+
+### Ejemplo de salida del comando `DVL+EVT_STATUS`
+```text
+========== ESTADO MOTOR DE EVENTOS (PLC) ==========
+EV0: HABILITADO | VPRIN (act=12.20) < 11.50 -> NO CUMPLE | TON: 0/30s | Disparado: NO
+EV1: HABILITADO | BLE_DOOR:F074BFF03C91 (act=1.00) == 1.00 -> CUMPLE | TON: 5/5s | Disparado: SI | Out GPIO15=1 (PULSO ACTIVO)
+EV2: HABILITADO | DT0 (act=0.00) == 1.00 -> NO CUMPLE | TON: 0/0s | Disparado: NO | Out GPIO15=0
+EV3: DESHABILITADO
+---------- DISPARADORES FECHA/HORA (DT) -----------
+RTC=2026-11-18 14:22:10
+DT0=*-*-* 08:00:00 (ESTADO=0)
+DT1=2026-11-20 14:30:00 (ESTADO=0)
+DT2=DESHABILITADO
+DT3=DESHABILITADO
+===================================================
+```

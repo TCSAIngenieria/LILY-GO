@@ -62,7 +62,7 @@ def procesar_mermaid(md_content, temp_files):
     return mermaid_pattern.sub(replace_with_image, md_content)
 
 
-def build_engineering_html(html_body):
+def build_engineering_html(html_body, fw_version="V07.19.05"):
     fecha_gen = datetime.now().strftime("%Y-%m-%d")
     css_style = """
     @page {
@@ -120,7 +120,8 @@ def build_engineering_html(html_body):
         padding: 8px 12px;
         border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.15);
-        min-width: 155px;
+        min-width: 175px;
+        white-space: nowrap;
     }
     .eng-banner-right div {
         margin-bottom: 2px;
@@ -278,7 +279,7 @@ def build_engineering_html(html_body):
         </div>
         <div class="eng-banner-right">
             <div><strong>Equipo:</strong> IoT Lite</div>
-            <div><strong>Versión FW:</strong> V07.18.00</div>
+            <div><strong>Versión FW:</strong> {fw_version}</div>
             <div><strong>Revisión:</strong> {fecha_gen}</div>
             <div><strong>Área:</strong> Ingeniería / I+D</div>
         </div>
@@ -299,13 +300,13 @@ def build_engineering_html(html_body):
 </html>"""
 
 
-def render_pdf_with_playwright(html_content, pdf_filepath):
+def render_pdf_with_playwright(html_content, pdf_filepath, fw_version="V07.19.05"):
     from playwright.sync_api import sync_playwright
 
-    header_template = """
+    header_template = f"""
     <div style="width:100%; font-family:'Segoe UI', Arial, sans-serif; font-size:7.5pt; color:#64748b; padding:0 14mm; display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding-bottom:3px;">
         <span><b>TCSA INGENIERÍA</b> — Plataforma IoT Lite</span>
-        <span>Especificación Técnica de Comandos (FW V07.18.00)</span>
+        <span>Especificación Técnica de Comandos (FW {fw_version})</span>
     </div>
     """
 
@@ -348,6 +349,9 @@ def convert_md_to_pdf(md_filepath):
         with open(md_filepath, "r", encoding="utf-8") as f:
             md_text = f.read()
 
+        fw_match = re.search(r"VERSION=([Vv0-9\.\-_A-Za-z]+)", md_text)
+        fw_version = fw_match.group(1) if fw_match else "V07.19.05"
+
         md_text = procesar_mermaid(md_text, temp_files)
 
         print("Convirtiendo Markdown a HTML...")
@@ -355,12 +359,12 @@ def convert_md_to_pdf(md_filepath):
         html_body = html_body.replace(r"\|", "|")
 
         # Eliminar párrafo inicial redundante si ya está en el banner
-        html_content = build_engineering_html(html_body)
+        html_content = build_engineering_html(html_body, fw_version=fw_version)
         pdf_filepath = md_filepath.rsplit(".", 1)[0] + ".pdf"
 
         print(f"Generando PDF profesional con Chromium (Playwright) en {pdf_filepath}...")
         try:
-            render_pdf_with_playwright(html_content, pdf_filepath)
+            render_pdf_with_playwright(html_content, pdf_filepath, fw_version=fw_version)
             print("¡PDF técnico de ingeniería generado exitosamente!")
         except Exception as e:
             print(f"Aviso: Falló Playwright ({e}), intentando con xhtml2pdf...")

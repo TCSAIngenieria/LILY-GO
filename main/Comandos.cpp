@@ -13,6 +13,8 @@ extern TinyGsm modem;
 #include <WiFi.h>
 #include "BridgeAP.h"
 #include <errno.h>
+#include "MotorEventos.h"
+#include "TensionAlimentacion.h"
 
 extern Preferences preferences;
 
@@ -40,6 +42,7 @@ uint en_modem;
 uint en_gps;
 
 extern unsigned long publishInterval;
+extern unsigned long keepAliveInterval;
 extern FOTAClass FOTA;
 uint32_t serialBaud = 4800;
 uint en_wifi;
@@ -223,6 +226,17 @@ String procesarComando(String comando) {
     guardar_en_flash("time", publishInterval_s);
     publishInterval = strtoul(publishInterval_s.c_str(), NULL, 10);
     respuesta = "TIEMPO SETEADO OK";
+
+  } else if (comando.startsWith("DVL+SKA=")) {
+    String ka_s = comando.substring(8);
+    unsigned long val = strtoul(ka_s.c_str(), NULL, 10);
+    if (val > 0) {
+      guardar_en_flash("ka_time", ka_s);
+      keepAliveInterval = val;
+      respuesta = "KEEP ALIVE SETEADO OK";
+    } else {
+      respuesta = "[ERR] Intervalo Keep Alive invalido (debe ser > 0 segundos)";
+    }
 
   } else if (comando.startsWith("DVL+SBAUD=")) {
     unsigned long val = strtoul(comando.substring(10).c_str(), NULL, 10);
@@ -716,6 +730,55 @@ String procesarComando(String comando) {
   } else if (comando == "DVL+QALI") {
     respuesta = "ALISADO=" + String(cantMed);
 
+  /* MOTOR DE EVENTOS (MICRO-PLC) */
+  } else if (comando.startsWith("DVL+SEVT=")) {
+    String arg = comando.substring(9);
+    int firstComma = arg.indexOf(',');
+    if (firstComma != -1) {
+      int id = arg.substring(0, firstComma).toInt();
+      String resto = arg.substring(firstComma + 1);
+      String err = "";
+      if (configurarEvento(id, resto, err)) {
+        respuesta = ">> EVENTO EV" + String(id) + " CONFIGURADO OK";
+      } else {
+        respuesta = "[ERR] " + err;
+      }
+    } else {
+      respuesta = "[ERR] Formato incorrecto. Uso: DVL+SEVT=<id>,<en>,<src>,<op>,<th>,<ton>,<act>,<trg> o DVL+SEVT=<id>,0";
+    }
+
+  } else if (comando.startsWith("DVL+QEVT=")) {
+    int id = comando.substring(9).toInt();
+    respuesta = obtenerConfiguracionEvento(id);
+
+  } else if (comando == "DVL+EVT_STATUS") {
+    extern float ADCValue[2];
+    respuesta = obtenerEstadoEventos(leer_tension_principal(), leer_tension_backup(), ADCValue[0], ADCValue[1]);
+
+  /* DISPARADORES POR FECHA Y HORA (DT0..DT3 PARA MOTOR DE EVENTOS) */
+  } else if (comando.startsWith("DVL+SDT=")) {
+    String arg = comando.substring(8);
+    int firstComma = arg.indexOf(',');
+    if (firstComma != -1) {
+      int id = arg.substring(0, firstComma).toInt();
+      String resto = arg.substring(firstComma + 1);
+      String err = "";
+      if (configurarDisparadorFechaHora(id, resto, err)) {
+        respuesta = ">> DISPARADOR DT" + String(id) + " CONFIGURADO OK (" + obtenerDisparadorFechaHora(id) + ")";
+      } else {
+        respuesta = "[ERR] " + err;
+      }
+    } else {
+      respuesta = "[ERR] Formato incorrecto. Uso: DVL+SDT=<0..3>,<YYYY-MM-DD HH:MM:SS> (o HH:MM:SS o 0 para desactivar)";
+    }
+
+  } else if (comando.startsWith("DVL+QDT=")) {
+    int id = comando.substring(8).toInt();
+    respuesta = obtenerDisparadorFechaHora(id);
+
+  } else if (comando == "DVL+QDT") {
+    respuesta = obtenerTodosDisparadoresFechaHora();
+
   } else if (comando == "DVL+RESET") {
     respuesta = ">> Reiniciando dispositivo...";
     DVL_PRINTLN(respuesta); // Lo mostramos antes del reset
@@ -731,6 +794,9 @@ String procesarComando(String comando) {
     /*COMANDOS DE CONSULTA*/
   } else if (comando == "DVL+QTIME") {
     respuesta = "TIME=" + String(publishInterval);
+
+  } else if (comando == "DVL+QKA") {
+    respuesta = "KEEP_ALIVE=" + String(keepAliveInterval);
 
   } else if (comando == "DVL+QFINI") {
     respuesta = "START_MARKER=" + startMarker;
