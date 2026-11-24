@@ -53,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.04";
+String versionado = "V07.19.05";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -978,7 +978,8 @@ void loop() {
     mantenerBridgeAP();
   }
   actualizarLED();
-  esp_task_wdt_reset(); // Alimenta el WDT
+  esp_task_wdt_reset(); // Alimenta el WDT de loopTask
+  vTaskDelay(1);        // Cede CPU 1 a IDLE1 para alimentar su WDT y evitar busy-wait al 100%
 }
 
 void actualizarLED() {

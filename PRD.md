@@ -153,7 +153,7 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "longitud": "-58.3816",
   "Tension_backup": 4.12,
   "Tension_principal": 12.0,
-  "Version": "V07.19.04",
+  "Version": "V07.19.05",
   "index": 483
 }
 ```
@@ -190,7 +190,7 @@ Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<s
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Version": "V07.19.04",
+  "Version": "V07.19.05",
   "reboot_count": 12,
   "conn_type": "GPRS",
   "conn_detail": "SIM7000 LTE-M",

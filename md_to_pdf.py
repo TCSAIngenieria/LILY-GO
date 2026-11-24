@@ -62,7 +62,7 @@ def procesar_mermaid(md_content, temp_files):
     return mermaid_pattern.sub(replace_with_image, md_content)
 
 
-def build_engineering_html(html_body, fw_version="V07.19.04"):
+def build_engineering_html(html_body, fw_version="V07.19.05"):
     fecha_gen = datetime.now().strftime("%Y-%m-%d")
     css_style = """
     @page {
@@ -300,7 +300,7 @@ def build_engineering_html(html_body, fw_version="V07.19.04"):
 </html>"""
 
 
-def render_pdf_with_playwright(html_content, pdf_filepath, fw_version="V07.19.04"):
+def render_pdf_with_playwright(html_content, pdf_filepath, fw_version="V07.19.05"):
     from playwright.sync_api import sync_playwright
 
     header_template = f"""
@@ -350,7 +350,7 @@ def convert_md_to_pdf(md_filepath):
             md_text = f.read()
 
         fw_match = re.search(r"VERSION=([Vv0-9\.\-_A-Za-z]+)", md_text)
-        fw_version = fw_match.group(1) if fw_match else "V07.19.04"
+        fw_version = fw_match.group(1) if fw_match else "V07.19.05"
 
         md_text = procesar_mermaid(md_text, temp_files)
 
