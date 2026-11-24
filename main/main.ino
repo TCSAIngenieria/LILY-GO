@@ -53,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.03";
+String versionado = "V07.19.04";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -401,10 +401,14 @@ void setup() {
 void loop() {
 
   mqtt.loop();
+  if (mqtt.connected()) {
+    mqttUltimaConexionOK = millis();
+  }
   unsigned long now = millis();
   static unsigned long unahora = 0;
   static int activeMqttClient = 0; // 0=ninguno, 1=WiFi, 2=GPRS
   static unsigned long lastNoDataMessage = 0;
+  static bool firstKeepAliveSent = false;
   static unsigned long last_10ms_event = 0;
   static unsigned long last_100ms_event = 0;
   static unsigned long last_1s_event = 0;
@@ -494,9 +498,9 @@ void loop() {
           delay(10); // pequeño delay para no saturar CPU
         }
 
-        // Apagamos GPS y reiniciamos modem antes de pasar a fase de datos
+        // Apagamos GPS antes de pasar a fase de datos (sin reiniciar hardware del modem)
         disableGPS();
-        modemRestart();
+        delay(500);
       } else {
         DVL_PRINTLN("[GPS] Omitido (EN_GPS=0). Iniciando modem directamente para conexion celular...");
       }
@@ -876,8 +880,10 @@ void loop() {
     esp_task_wdt_reset();
   }
 
-  // Keep Alive si no hay datos para transmitir
-  if (now - lastNoDataMessage >= keepAliveInterval * 1000UL) {
+  // Keep Alive: envio inmediato al conectar por primera vez a MQTT y luego cada keepAliveInterval segundos
+  bool dueInitialKA = (!firstKeepAliveSent && mqtt.connected());
+  bool duePeriodicKA = (now - lastNoDataMessage >= keepAliveInterval * 1000UL);
+  if (dueInitialKA || duePeriodicKA) {
     String cType = "NO_CONECTADO";
     String cDetail = "N/A";
     String rsrq = "N/A";
@@ -913,7 +919,9 @@ void loop() {
           topic1, ident, printCurrentTime(), ultimaLat, ultimaLon, versionado,
           rebootCount, cType, cDetail, modemIMEI, modemIMSI, modemICCID, rsrq,
           rsrp, rssi, leer_tension_backup(), leer_tension_principal());
-      publish_mqtt_json(topic1, jsonKeepAlive);
+      if (publish_mqtt_json(topic1, jsonKeepAlive)) {
+        firstKeepAliveSent = true;
+      }
     } else if (modemDebugLevel >= 1) {
       DVL_PRINTLN("[MQTT-DBG] Keep-Alive omitido: esperando conexion activa al broker MQTT...");
     }

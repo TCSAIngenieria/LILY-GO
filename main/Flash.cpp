@@ -55,10 +55,10 @@ void lectura_flash() {
   DVL_PRINTLN(apn);
   DVL_PRINT("ultima ultimo publish_time guardado: ");
   DVL_PRINTLN(spublishInterval);
-  DVL_PRINT(publishInterval);
+  DVL_PRINTLN(publishInterval);
   DVL_PRINT("ultimo keep_alive_time guardado: ");
   DVL_PRINTLN(skeepAliveInterval);
-  DVL_PRINT(keepAliveInterval);
+  DVL_PRINTLN(keepAliveInterval);
 }
 
 void guardar_en_flash(const String& clave, const String& valor) {
