@@ -27,6 +27,7 @@ Este documento detalla todos los comandos disponibles en el sistema, su sintaxis
 | `DVL+SFFIN=<marker>` | Establece el marcador de fin de la trama de datos. | `DVL+SFFIN=\r` |
 | `DVL+SPARSE=<char>` | Establece el carácter separador de campos en la trama. | `DVL+SPARSE=;` |
 | `DVL+STIME=<seg>` | Establece el intervalo de publicación de datos (en segundos). | `DVL+STIME=60` |
+| `DVL+SKA=<seg>` | Establece el intervalo de publicación de la trama Keep Alive en segundos (por defecto `300`). | `DVL+SKA=300` |
 
 ### Habilitaciones (Flags)
 
@@ -160,8 +161,13 @@ Estos comandos devuelven el estado actual de las configuraciones.
 
 | Comando | Retorna (Ejemplo) | Descripción |
 | :--- | :--- | :--- |
-| `DVL+VER` | `VERSION=v1.0` | Versión del firmware. |
+| `DVL+VER` | `VERSION=V07.19.03` | Versión del firmware. |
 | `DVL+QTIME` | `TIME=60` | Intervalo de publicación. |
+| `DVL+QKA` | `KEEP_ALIVE=300` | Intervalo de publicación de la trama Keep Alive (segundos). |
+| `DVL+QEVT=<id>` | `EV0=1,VPRIN,<,11.50,30,MQTT,ONESHOT` | Configuración de la regla de evento `<id>` (`0..3`). |
+| `DVL+EVT_STATUS` | *(Tabla por Serial/RESPUESTA)* | Estado en vivo de `EV0..EV3`, `DT0..DT3` y reloj `RTC`. |
+| `DVL+QDT=<id>` | `DT0=2026-11-20 08:30:00 (ESTADO=0)` | Programación y estado del disparador fecha/hora `<id>` (`0..3`). |
+| `DVL+QDT` | `RTC=...` / `DT0..DT3` | Hora `RTC` actual y listado de los 4 disparadores fecha/hora. |
 | `DVL+QBAUD` | `BAUD=4800` | Velocidad compartida de UART2. |
 | `DVL+QPARITY_MODBUS` | `PARITY_MODBUS=EVEN` | Paridad Modbus guardada. |
 | `DVL+QENVIO_MODBUS` | `ENVIO_MODBUS=DIRECTO` | Modo de envio Modbus guardado. |
@@ -188,3 +194,45 @@ Cualquier comando que comience con `EXP+` será retransmitido tal cual al puerto
 
 - **Sintaxis:** `EXP+<cualquier_comando>`
 - **Ejemplo:** `EXP+LEER` (Envía "EXP+LEER" a la expansora y devuelve su respuesta).
+
+---
+
+## 6. Motor de Eventos (Micro-PLC) y Disparadores Fecha/Hora
+
+Permite programar hasta **4 reglas determinísticas** (`EV0`..`EV3`, evaluadas cada 100 ms con temporizador TON persistido en NVS) y **4 disparadores por fecha y hora** (`DT0`..`DT3`). Las alertas se publican de inmediato en `DVL/LILY-GO/<ID_EQUIPO>/EVENTOS` (o en Flash si no hay enlace MQTT).
+
+### Configurar Regla de Evento (`DVL+SEVT`)
+- **Sintaxis:** `DVL+SEVT=<id>,<en>,<src>,<op>,<th>,<ton>,<act>,<trg>` (o `DVL+SEVT=<id>,0` para deshabilitar).
+  - `<id>`: Regla `0..3`.
+  - `<en>`: `1` (activa) o `0` (inactiva).
+  - `<src>` (fuentes soportadas):
+    - Alimentación y Analógicos: `VPRIN`, `VBACK`, `ADC0`, `ADC1`.
+    - Digitales y Enlace: `DI1` (`GPIO13`), `DI2` (`GPIO14`), `COMM` (estado MQTT).
+    - Sensores Cableados: `TEMP` (DS18B20), `S0`..`S15` (canales expansora serial).
+    - Sensores BLE Moko (con filtro opcional por MAC completa o últimos 4 hex `:<mac>`): `BLE_DOOR[:<mac>]`, `BLE_MOV[:<mac>]`, `BLE_TEMP[:<mac>]`, `BLE_HUM[:<mac>]`, `BLE_BAT[:<mac>]`.
+    - Salud ESP32: `TEMP_MCU`, `HEAP`, `BTN` (`GPIO0`).
+    - Disparadores Fecha/Hora: `DT0`..`DT3` (alias `TIME0`..`TIME3`, `DATE0`..`DATE3`).
+  - `<op>`: `>`, `<`, `>=`, `<=`, `==`, `!=`.
+  - `<th>`: Umbral numérico.
+  - `<ton>`: Confirmación continua en segundos (`0..86400`).
+  - `<act>`: `MQTT`, `OUT:<pin>:HIGH`, `OUT:<pin>:LOW`, `OUT:<pin>:PULSE:<seg>`, `CYCLE_PWR` (`GPIO23`), `RESTART`.
+  - `<trg>`: `ONESHOT` o `REPEAT:<seg>`.
+- **Ejemplos:**
+  - `DVL+SEVT=0,1,VPRIN,<,11.5,30,MQTT,ONESHOT`
+  - `DVL+SEVT=1,1,BLE_DOOR:F074BFF03C91,==,1,5,OUT:15:PULSE:30,ONESHOT`
+  - `DVL+SEVT=2,1,DT0,==,1,0,OUT:15:PULSE:20,ONESHOT`
+
+### Consultas y Estado del Motor
+- `DVL+QEVT=<0..3>`: Devuelve la regla configurada (`EV<id>=...`).
+- `DVL+EVT_STATUS`: Imprime el estado en vivo de `EV0..EV3`, lecturas actuales, progreso TON, salidas y bloque `DT0..DT3`.
+
+### Configurar y Consultar Disparadores Fecha/Hora (`DVL+SDT` / `DVL+QDT`)
+- **Sintaxis:** `DVL+SDT=<0..3>,<fecha_hora|0>`
+  - Fecha y hora puntual: `YYYY-MM-DD HH:MM:SS` (o `YYYY-MM-DD HH:MM`).
+  - Horario diario recurrente: `HH:MM:SS` o `HH:MM` (equivale a `*-*-* HH:MM:SS`).
+  - Comodines por campo (`*`): ej. `*-*-01 12:00:00` (día 1 de cada mes).
+  - Deshabilitar índice: `DVL+SDT=<0..3>,0` (o `OFF`).
+- **Consultas:** `DVL+QDT=<0..3>` (índice individual y estado `0`/`1`) y `DVL+QDT` (reloj `RTC` actual + `DT0..DT3`).
+- **Ejemplos:**
+  - `DVL+SDT=0,08:00:00`
+  - `DVL+SDT=1,2026-11-20 14:30:00`

@@ -99,6 +99,21 @@ El dispositivo cuenta con un diseño de firmware modular habilitable bajo demand
 *   **Filtros de Descarte:** Umbrales mínimos configurables. Si la lectura es inferior a un valor umbral, el firmware la sustituye por un valor estático por defecto (útil para eliminar ruido en cero).
 *   **Alisado (Promedio Móvil):** Muestreo acumulado (por defecto de 50 mediciones) antes de publicar un dato estabilizado.
 
+### 4.6 Motor de Eventos Programable (Micro-PLC)
+*   Evaluador determinístico de **4 reglas** (`EV0` a `EV3`) ejecutado cada `100 ms` con persistencia en Flash NVS (`Preferences`) y temporizador de confirmación continua **TON** (`0` a `86400` segundos).
+*   **Fuentes soportadas (`<src>`):**
+    *   Alimentación y ADC: `VPRIN` (`GPIO36`), `VBACK` (`GPIO35`), `ADC0` (`GPIO34`), `ADC1` (`GPIO39`).
+    *   Digitales y enlace: `DI1` (`GPIO13`), `DI2` (`GPIO14`), `COMM` (estado MQTT).
+    *   Sensores cableados: `TEMP` (DS18B20) y `S0`..`S15` (expansora serial).
+    *   Sensores inalámbricos BLE Moko (con filtrado opcional por dirección MAC completa o últimos 4 caracteres hex `:<mac>`): `BLE_DOOR[:<mac>]`, `BLE_MOV[:<mac>]`, `BLE_TEMP[:<mac>]`, `BLE_HUM[:<mac>]`, `BLE_BAT[:<mac>]`.
+    *   Salud ESP32: `TEMP_MCU`, `HEAP`, `BTN` (`GPIO0`).
+    *   Disparadores horarios (`DT0` a `DT3` configurables por `DVL+SDT=<0..3>,<fecha_hora|0>`): admiten fecha puntual (`YYYY-MM-DD HH:MM:SS`), horario diario (`HH:MM:SS`) y comodines (`*`).
+*   **Acciones y rearme:** `MQTT`, `OUT:<pin>:HIGH`, `OUT:<pin>:LOW`, `OUT:<pin>:PULSE:<seg>`, `CYCLE_PWR` (`GPIO23`) y `RESTART`; con modos `ONESHOT` y `REPEAT:<seg>`. Configurables mediante `DVL+SEVT`, `DVL+QEVT` y `DVL+EVT_STATUS`.
+
+### 4.7 Sincronización de Reloj UTC (`ClockSync`)
+*   Módulo unificado (`ClockSync.h/.cpp`) encargado de mantener el RTC del ESP32 estrictamente en **UTC** sin depender de `+CCLK` ni zonas horarias NITZ locales del módem.
+*   En modo celular (`GSM`) opera de forma **no bloqueante** con jerarquía de fuentes `RED (*PSUTTZ) < GPS < NTP (+CNTP modo 1)`. Al validar `+CNTP:` vía URC en UTC puro, aplica reintento cada `60 s` ante fallo y resincronización cada `8 horas` tras éxito. En modo `WiFi` opera en paralelo mediante `updateClockFromNTP_wifi()` en `Fechayhora.cpp`.
+
 ## 5. Protocolo de Telemetría (MQTT JSON Payloads)
 
 Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-GO/<ID_LILY>`) se estructuran en formato JSON. Dependiendo de los módulos activos, el firmware transmite diferentes payloads:
@@ -138,7 +153,7 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "longitud": "-58.3816",
   "Tension_backup": 4.12,
   "Tension_principal": 12.0,
-  "Version": "V07.19.00",
+  "Version": "V07.19.03",
   "index": 483
 }
 ```
@@ -167,7 +182,7 @@ de transmitir; las respuestas tardías requieren una revisión aparte. No se agr
 un comando de timeout ni se modificaron los tiempos para esta versión.
 
 ### 5.3 Payload de Diagnóstico (Keep-Alive)
-Emitido con información técnica del módem y estado de la red celular:
+Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<seg>` / `DVL+QKA` (**300 segundos** por defecto), con información técnica del módem y estado de la red celular:
 ```json
 {
   "topic": "DVL/LILY-GO/OBU_123",
@@ -175,7 +190,7 @@ Emitido con información técnica del módem y estado de la red celular:
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Version": "V04.01.02",
+  "Version": "V07.19.03",
   "reboot_count": 12,
   "conn_type": "GPRS",
   "conn_detail": "SIM7000 LTE-M",
@@ -185,6 +200,24 @@ Emitido con información técnica del módem y estado de la red celular:
   "RSRQ": "-11.0",
   "RSRP": "-95.0",
   "RSSI": "-78.0"
+}
+```
+
+### 5.4 Payload de Eventos (Micro-PLC)
+Transmitido de inmediato al cumplirse la condición y temporizador TON de alguna regla (`EV0..EV3`) bajo el tópico `DVL/LILY-GO/<ID_LILY>/EVENTOS` (o encolado en Flash SPIFFS si no hay conexión MQTT):
+```json
+{
+  "ident": "OBU_123",
+  "status": "event-triggered",
+  "event_id": 0,
+  "date": "2026-11-20 14:30:05",
+  "src": "BLE_TEMP:D47DA699A56B",
+  "ble_mac": "D47DA699A56B",
+  "val": 29.4,
+  "op": ">",
+  "threshold": 28.0,
+  "ton": 10,
+  "action": "MQTT"
 }
 ```
 

@@ -28,6 +28,7 @@
 #include "GPRS.h"
 #include "MQTT.h"
 #include "Modbus.h"
+#include "MotorEventos.h"
 #include "SerialSecundario.h"
 #include "TensionAlimentacion.h"
 #include "WebServerConfig.h"
@@ -52,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.00";
+String versionado = "V07.19.03";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -131,6 +132,7 @@ unsigned long startAttemptTime = millis();
 unsigned long lastPublish = 0;
 extern unsigned long publishInterval; // intervalo de publicacion del dato //60
                                       // segundos por default//
+extern unsigned long keepAliveInterval; // intervalo de publicacion de keep-alive // 300 seg por default
 unsigned long lastReconnectAttempt = 0;
 
 /*BOToN MODO AP*/
@@ -323,6 +325,7 @@ void setup() {
   flash_init();
   initADC();
   initTensionAlimentacion();
+  initMotorEventos();
 
   // Inicializacion del sensor
   sensor->begin();
@@ -412,6 +415,15 @@ void loop() {
   }
 
   if (now - last_100ms_event >= 100) {
+    static float vPrinActual = 0.0f;
+    static float vBackActual = 0.0f;
+    static unsigned long lastTensionRead = 0;
+    if (now - lastTensionRead >= 500 || lastTensionRead == 0) {
+      lastTensionRead = now;
+      vPrinActual = leer_tension_principal();
+      vBackActual = leer_tension_backup();
+    }
+    procesarMotorEventos(vPrinActual, vBackActual, ADCValue[0], ADCValue[1]);
     last_100ms_event = now;
     if (++cADC >= tADC) {
       procesarADC(ADCValue);
@@ -638,6 +650,14 @@ void loop() {
       std::vector<MokoSensorData> bleDataList = bleScanner.getLatestData();
 
       for (const auto &bleData : bleDataList) {
+        // Alimentar motor de eventos con telemetria BLE indexada por MAC
+        float bTemp = (bleData.temperature != 0.0f) ? bleData.temperature : 0.0f;
+        float bHum  = (bleData.humidity != 0.0f) ? bleData.humidity : 0.0f;
+        float bDoor = bleData.hasDoorOpen ? (bleData.doorOpen ? 1.0f : 0.0f) : (float)bleData.door;
+        float bMov  = bleData.hasMotionStatus ? (float)bleData.motion : (bleData.hasPirRaw ? (float)bleData.pirRaw : 0.0f);
+        float bBat  = (float)bleData.batteryLevel;
+        actualizarDatosBLE(bleData.mac, bTemp, bHum, bDoor, bMov, bBat);
+
         // Topic for BLE: DVL/LILY-GO/<ident>/BLE/<MAC>
         String topicBLE = "DVL/LILY-GO/" + ident + "/BLE/" + bleData.mac;
   topicBLE.toUpperCase();
@@ -857,7 +877,7 @@ void loop() {
   }
 
   // Keep Alive si no hay datos para transmitir
-  if (now - lastNoDataMessage > 5000) {
+  if (now - lastNoDataMessage >= keepAliveInterval * 1000UL) {
     String cType = "NO_CONECTADO";
     String cDetail = "N/A";
     String rsrq = "N/A";

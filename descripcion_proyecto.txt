@@ -22,6 +22,8 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
 #### Conectividad y Protocolos
 - **MQTT:** Protocolo principal para envío de datos y recepción de comandos.
 - **Modo Híbrido:** Prioriza la conexión WiFi cuando está disponible; cambia automáticamente a GPRS en caso contrario.
+- **Sincronización Horaria UTC (`ClockSync`):** Sincronización no bloqueante en GSM mediante `+CNTP` modo 1 (UTC puro vía URC), respaldo de red `*PSUTTZ` y fix GPS, además de NTP estándar cuando opera por WiFi.
+- **Keep Alive Configurable:** Trama de diagnóstico con intervalo persistente en Flash configurable mediante `DVL+SKA=<seg>` y `DVL+QKA` (`300 s` por defecto).
 - **Diagnóstico WiFi por Serial:** Al conectarse o reconectarse, informa ID LILY, SSID/BSSID, MAC, hostname, IP, máscara, gateway, DNS, canal, RSSI y destino MQTT sin exponer la contraseña.
 - **Buffering (Flash):** Almacenamiento temporal de paquetes en memoria SPIFFS/LittleFS ante cortes de conexión para evitar pérdida de datos.
 
@@ -39,6 +41,7 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
   - Paridad persistente NONE/EVEN/ODD mediante `DVL+SPARITY_MODBUS` y `DVL+QPARITY_MODBUS`; baud compartido mediante `DVL+SBAUD` y `DVL+QBAUD`. Cambiar uno conserva el otro. Serial común usa 8N1; Modbus usa el formato guardado (8N1/8E1/8O1).
 - **Sensores Dedicados:** Soporte nativo para sensor de temperatura DS18B20.
 - **Expansora I/O:** Comunicación con placas expansoras vía puerto serial secundario.
+- **Motor de Eventos Programable (Micro-PLC):** Evaluación periódica cada 100 ms de 4 reglas (`EV0`..`EV3`) con temporizador TON y rearme (`ONESHOT`/`REPEAT`). Monitorea tensiones/ADC (`VPRIN`, `VBACK`, `ADC0`, `ADC1`), entradas digitales/enlace (`DI1`, `DI2`, `COMM`), sensores cableados (`TEMP`, `S0`..`S15`), balizas BLE Moko filtrables por MAC (`BLE_DOOR`, `BLE_MOV`, `BLE_TEMP`, `BLE_HUM`, `BLE_BAT`), salud del ESP32 (`TEMP_MCU`, `HEAP`, `BTN`) y 4 disparadores fecha/hora (`DT0`..`DT3`). Ejecuta acciones locales (`OUT`, `CYCLE_PWR`, `RESTART`) y emite alertas inmediatas por MQTT.
 
 #### Gestión del Dispositivo
 - **Modo AP (Access Point):** Servidor web integrado para configuración inicial (WiFi, parámetros MQTT) activable mediante botón físico.
@@ -51,5 +54,6 @@ El sistema reporta datos en formato JSON a través de tópicos MQTT específicos
 - `DVL/LILY-GO/<ID_LILY>`: Tópico principal de telemetría.
 - `DVL/LILY-GO/<ID_LILY>/ADC`: Reportes específicos de entradas analógicas.
 - `DVL/LILY-GO/<ID_LILY>/MODBUS/<idx>`: Reportes Modbus separados por consulta (idx 1-25), con `baud` y `paridad`. El ID del dispositivo está en el primer byte de la trama `consulta`.
+- `DVL/LILY-GO/<ID_LILY>/EVENTOS`: Alertas inmediatas generadas por el Motor de Eventos (Micro-PLC).
 
 Los paquetes incluyen timestamp, ubicación, e información de sensores según la configuración habilitada (`EN_SENSOR`, `EN_SERIAL`, `EN_MODBUS`).
