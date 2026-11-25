@@ -53,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.06";
+String versionado = "V07.19.10";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -132,7 +132,7 @@ unsigned long startAttemptTime = millis();
 unsigned long lastPublish = 0;
 extern unsigned long publishInterval; // intervalo de publicacion del dato //60
                                       // segundos por default//
-extern unsigned long keepAliveInterval; // intervalo de publicacion de keep-alive // 300 seg por default
+extern unsigned long keepAliveInterval; // intervalo de publicacion de keep-alive // 900 seg por default
 unsigned long lastReconnectAttempt = 0;
 
 /*BOToN MODO AP*/

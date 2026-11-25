@@ -22,12 +22,12 @@ Todos los comandos descriptos en este documento pueden ejecutarse de manera indi
 | Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
 |:---|:---|:---|:---|
 | `DVL+ID=<id>` | Define el identificador único del equipo en Flash NVM, actualiza el tópico raíz a `DVL/LILY-GO/<id>` y fuerza la reconexión al Broker MQTT. | `DVL+ID=60001` | `Rident_OK (TOPIC: DVL/LILY-GO/60001)` |
-| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.06` |
+| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.10` |
 | `DVL+RESET` | Ejecuta un reinicio inmediato por software del microcontrolador ESP32 (`ESP.restart()`). | `DVL+RESET` | `>> Reiniciando dispositivo...` |
 | `DVL+STIME=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de telemetría de sensores (en segundos). | `DVL+STIME=60` | `TIEMPO SETEADO OK` |
 | `DVL+QTIME` | Consulta el intervalo de publicación de telemetría configurado actualmente. | `DVL+QTIME` | `TIME=60` |
-| `DVL+SKA=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de la trama Keep Alive (en segundos, por defecto 300s; al arrancar envía una primera trama inmediata al conectar a MQTT). | `DVL+SKA=300` | `KEEP ALIVE SETEADO OK` |
-| `DVL+QKA` | Consulta el intervalo de publicación de la trama Keep Alive configurado actualmente. | `DVL+QKA` | `KEEP_ALIVE=300` |
+| `DVL+SKA=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de la trama Keep Alive (en segundos, por defecto 900s; al arrancar envía una primera trama inmediata al conectar a MQTT). | `DVL+SKA=900` | `KEEP ALIVE SETEADO OK` |
+| `DVL+QKA` | Consulta el intervalo de publicación de la trama Keep Alive configurado actualmente. | `DVL+QKA` | `KEEP_ALIVE=900` |
 | `DVL+FOTA=<url>` | Inicia una actualización remota de firmware (FOTA) descargando el binario desde la URL indicada (soporta WiFi o GPRS según la interfaz activa). | `DVL+FOTA=http://servidor.com/fw/iot_lite_v071800.bin` | `FOTA_INICIADA` |
 | `DVL+CFG_FOTA=<t>,<sec>` | Configura los parámetros de descarga FOTA en NVM:<br>• `<t>`: Timeout máximo en segundos (`> 0`).<br>• `<sec>`: Protocolo (`0` = HTTP estándar, `1` = HTTPS seguro). | `DVL+CFG_FOTA=600,0` | `>> FOTA CONFIGURADO: TIMEOUT=600s, SEGURIDAD=0` |
 | `DVL+QCFG_FOTA` | Consulta los parámetros actuales de timeout y seguridad configurados para FOTA. | `DVL+QCFG_FOTA` | `TIMEOUT=600 \| SECURE=0` |
@@ -107,6 +107,9 @@ IP Asignada        : 10.124.88.14
 
 ## 6. Sensores, Escáner BLE, Puerto Serial Secundario y Expansora
 
+En L02S/EA01, el reporte `/BLE/<MAC>` incluye `door` (`0` cerrado, `1` abierto) y `door_open` (`false`/`true`) leídos del anuncio. El reporte se envía tras el escaneo cuando se detecta el sensor; un cambio de puerta no inicia un escaneo por sí mismo.
+Si llegan varios anuncios de la misma MAC y tipo durante ese escaneo, se publica la última lectura una sola vez. En H4 Pro se usa el nombre `DVL` o `PaPeR` de cualquier anuncio de esa MAC para validar el sensor, pero solo la trama `0x70` genera el reporte de temperatura/humedad. Sin `0x70` no hay reporte H4 en ese ciclo.
+
 | Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
 |:---|:---|:---|:---|
 | `DVL+EN_SENSOR=<1\|0>` | Habilita (`1`) o deshabilita (`0`) la lectura periódica del sensor de temperatura OneWire (`DS18B20`), publicado bajo el subtópico `/DS18B20`. | `DVL+EN_SENSOR=1` | `>> HABILITADO LECTURA SENSOR` |
@@ -184,8 +187,8 @@ El timeout RX sigue en 200 ms y el polling en una consulta cada 2 s como mínimo
 ## 8. Conversor Analógico-Digital (ADC) y Monitoreo de Alimentación
 
 ### Asignación de Pines Analógicos (ESP32 ADC1 — 12 bits, Atenuación 11 dB)
-* **`GPIO36` (`S_VP / SOLAR_IN`) — Alimentación Principal (`Tension_principal`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). Se reporta **siempre de forma nativa** en el JSON de `keep-alive` y en las tramas de sensores (`DS18B20`, `SERIAL`, `MODBUS`, `BLE`).
-* **`GPIO35` (`IO35 / VVBAT`) — Alimentación de Backup / Batería (`Tension_backup`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). Se reporta **siempre de forma nativa** en el JSON de `keep-alive` y en las tramas de sensores.
+* **`GPIO36` (`S_VP / SOLAR_IN`) — Alimentación Principal (`Tension_principal`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). Se publica la lectura en los JSON de `keep-alive`, `DS18B20`, `SERIAL` y `MODBUS`. Este pin mide `SOLAR_IN`, no `VIN_5V`.
+* **`GPIO35` (`IO35 / VVBAT`) — Alimentación de Backup / Batería (`Tension_backup`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). En esos mismos JSON se publica `4.208701 V` simulado cuando `Tension_principal > 4.5 V`; en caso contrario se publica la lectura real de `GPIO35`. Los JSON `BLE` y `/ADC` no incluyen estas tensiones. El valor usado por la regla `VBACK` del motor de eventos sigue siendo la lectura de `GPIO35`.
 * **`GPIO34` — Entrada Analógica Externa `ADC0` (Índice `<n> = 0`):** Canal analógico configurable con filtro de umbral mínimo, promedio móvil (`cantMed`) y calibración lineal (`factor` / `offset`). Publicado bajo la clave `"adc0"` en el subtópico `/ADC`.
 * **`GPIO39` (`S_VN`) — Entrada Analógica Externa `ADC1` (Índice `<n> = 1`):** Canal analógico configurable con filtro de umbral mínimo, promedio móvil (`cantMed`) y calibración lineal (`factor` / `offset`). Publicado bajo la clave `"adc1"` en el subtópico `/ADC`.
 

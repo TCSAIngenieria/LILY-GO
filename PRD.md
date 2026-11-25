@@ -79,8 +79,11 @@ El dispositivo cuenta con un diseño de firmware modular habilitable bajo demand
 *   Se incluye un comando de reinicio físico de la expansora (`DVL+EXP_RESET`) mediante el pin `SENSOR_POWER_PIN`.
 
 ### 4.3 Red de Sensores Bluetooth (BLE Moko)
-*   Escaneo continuo de balizas BLE usando el controlador `NimBLE` de alta eficiencia.
+*   Escaneo periódico de balizas BLE usando `NimBLE` (ventanas de 5 segundos, con intervalo de 30 segundos entre inicios).
 *   Decodificación nativa de tramas propietarias del fabricante **Moko** (modelos de sensores `L02S`, `PaPeR`, `H4Pro`).
+*   En H4 Pro, el anuncio con nombre `DVL` o `PaPeR` valida la MAC durante el escaneo aunque llegue en otro slot; solo se publica la trama de temperatura/humedad `0x70`. Las tramas `0x40`, `0x50` y `0x60` no generan otro JSON que desplace esa medicion. Si no se detecta `0x70` en ese escaneo, no hay reporte H4. MOKO Door mantiene su decodificación independiente mediante manufacturer data y trama `0x81`.
+*   Dentro de un escaneo se conserva la última lectura de cada MAC y tipo de trama: los anuncios repetidos de L02S/EA01 y H4 Pro `0x70` no producen varios reportes del mismo sensor.
+*   En L02S con service data `EA01`, el JSON BLE incluye `door` (`0` cerrado, `1` abierto) y `door_open` (`false`/`true`) según el bit de estado recibido. Esto informa el estado en cada lectura publicada; no agrega un disparo inmediato por cambio entre escaneos.
 *   Extracción dinámica de: nivel de batería de los tags, temperatura, humedad relativa, estado de movimiento, aceleración en 3 ejes (X, Y, Z) e información de proximidad (UUID/Major/Minor).
 
 ### 4.4 Canal de Telemetría Modbus RTU
@@ -130,9 +133,9 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Tension_backup": 4.15,
-  "Tension_principal": 12.2,
-  "Version": "V04.01.02",
+  "Tension_backup": 4.208701,
+  "Tension_principal": 5.08,
+  "Version": "V07.19.10",
   "index": 482
 }
 ```
@@ -151,9 +154,9 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Tension_backup": 4.12,
-  "Tension_principal": 12.0,
-  "Version": "V07.19.06",
+  "Tension_backup": 4.208701,
+  "Tension_principal": 5.08,
+  "Version": "V07.19.10",
   "index": 483
 }
 ```
@@ -182,7 +185,7 @@ de transmitir; las respuestas tardías requieren una revisión aparte. No se agr
 un comando de timeout ni se modificaron los tiempos para esta versión.
 
 ### 5.3 Payload de Diagnóstico (Keep-Alive)
-Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<seg>` / `DVL+QKA` (**300 segundos** por defecto), con información técnica del módem y estado de la red celular:
+Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<seg>` / `DVL+QKA` (**900 segundos** por defecto), con información técnica del módem y estado de la red celular:
 ```json
 {
   "topic": "DVL/LILY-GO/OBU_123",
@@ -190,7 +193,9 @@ Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<s
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Version": "V07.19.06",
+  "Tension_principal": 5.08,
+  "Tension_backup": 4.208701,
+  "Version": "V07.19.10",
   "reboot_count": 12,
   "conn_type": "GPRS",
   "conn_detail": "SIM7000 LTE-M",
@@ -202,6 +207,13 @@ Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<s
   "RSSI": "-78.0"
 }
 ```
+
+En los JSON de sensor, serial, Modbus y keep alive, `Tension_principal` es la
+lectura de `GPIO36/SOLAR_IN`. Si supera `4.5 V`, `Tension_backup` se publica
+como `4.208701 V` simulado porque no puede medirse la pila por `GPIO35/VVBAT`
+en esa condición; de lo contrario se publica la lectura real de `GPIO35`.
+Los JSON BLE y ADC no incluyen estas tensiones. Los paquetes ya guardados
+conservan el valor que tenían al generarse.
 
 ### 5.4 Payload de Eventos (Micro-PLC)
 Transmitido de inmediato al cumplirse la condición y temporizador TON de alguna regla (`EV0..EV3`) bajo el tópico `DVL/LILY-GO/<ID_LILY>/EVENTOS` (o encolado en Flash SPIFFS si no hay conexión MQTT):

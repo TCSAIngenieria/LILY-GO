@@ -2,9 +2,12 @@
 #include "Debug.h"
 
 #include "esp_task_wdt.h"
+#include <utility>
 #include <vector>
 
 static std::vector<MokoSensorData> _tempDataList;
+static std::vector<MokoSensorData> _h4DataList;
+static std::vector<std::pair<String, String>> _namedDevices;
 static bool _foundDevice = false;
 
 static const uint16_t MOKO_DOOR_MANUFACTURER_ID = 0x620A;
@@ -14,6 +17,18 @@ static String cleanMacAddress(const std::string &macAddress) {
   String cleanMac = String(macAddress.c_str());
   cleanMac.replace(":", "");
   return cleanMac;
+}
+
+static void storeLatest(std::vector<MokoSensorData> &list,
+                        const MokoSensorData &data) {
+  for (auto &existing : list) {
+    if (existing.mac == data.mac && existing.frameType == data.frameType &&
+        existing.uuid == data.uuid) {
+      existing = data;
+      return;
+    }
+  }
+  list.push_back(data);
 }
 
 static uint16_t readU16BE(const std::string &data, size_t index) {
@@ -103,13 +118,33 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
     DVL_PRINT(" RSSI: ");
     DVL_PRINTLN(advertisedDevice->getRSSI());
 
-    if (!advertisedDevice->haveName() ||
-    (advertisedDevice->getName().find("DVL") == std::string::npos &&
-     advertisedDevice->getName().find("PaPeR") == std::string::npos)) {
-    return;
-    }
-
     std::string macAddress = advertisedDevice->getAddress().toString();
+    String cleanMac = cleanMacAddress(macAddress);
+    bool named = advertisedDevice->haveName() &&
+                 (advertisedDevice->getName().find("DVL") != std::string::npos ||
+                  advertisedDevice->getName().find("PaPeR") != std::string::npos);
+    if (named) {
+      bool known = false;
+      for (auto &device : _namedDevices) {
+        if (device.first == cleanMac) {
+          device.second = advertisedDevice->getName().c_str();
+          known = true;
+          break;
+        }
+      }
+      if (!known) {
+        _namedDevices.emplace_back(cleanMac,
+                                   String(advertisedDevice->getName().c_str()));
+      }
+
+      // MOKO Door usa manufacturer data; darle prioridad sobre los slots FEAB.
+      MokoSensorData doorData;
+      if (mokoDoorTryParseAdvertisement(advertisedDevice, doorData)) {
+        storeLatest(_tempDataList, doorData);
+        _foundDevice = true;
+        return;
+      }
+    }
 
     // ==================== MOKO BEACONX PRO (H4 Pro) ====================
     bool isMoko = false;
@@ -293,7 +328,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
             case 0x50: { // iBeacon
               // Notice: iBeacon payload might use slightly different index for frameType, 
               // but assuming UUID 0xFEAB is still present and frameType is right after.
-              if (frameStart + 18 < payload.size()) {
+              if (frameStart + 22 < payload.size()) {
                 h4Data.rssi1m = (int8_t)payload[frameStart + 1]; // -100~0dBm (similar to ranging)
                 h4Data.advInterval = payload[frameStart + 2] * 100;
                 
@@ -411,27 +446,19 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         }
       }
 
-      // Even without T&H frame, save raw data
-      if (!h4Data.valid) {
-        DVL_PRINTLN("  (!) No T&H frame (0x70) found, saving raw data only");
-        h4Data.valid = true;
+      // Solo 0x70 contiene temperatura y humedad; el nombre de otros slots
+      // ya quedo asociado a esta MAC para validar el reporte al cerrar el scan.
+      if (h4Data.frameType == 0x70 && h4Data.valid) {
+        storeLatest(_h4DataList, h4Data);
       }
-
-      _tempDataList.push_back(h4Data);
-      _foundDevice = true;
       DVL_PRINTLN("================================================");
       return;
     }
     // ==================== END H4 PRO ====================
 
-    // ==================== MOKO Door/PIR advertising ====================
-    MokoSensorData doorData;
-    if (mokoDoorTryParseAdvertisement(advertisedDevice, doorData)) {
-      _tempDataList.push_back(doorData);
-      _foundDevice = true;
+    if (!named) {
       return;
     }
-    // ==================== END MOKO Door/PIR advertising ====================
 
     if (isEa01) {
       DVL_PRINTLN(">>> TARGET DEVICE FOUND (DVL/EA01) <<<");
@@ -496,7 +523,10 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         uint8_t statusByte = payloadVector[8];
         _tempData.motion = (statusByte >> 1) & 0x01;
         _tempData.door = (statusByte >> 0) & 0x01;
+        _tempData.doorOpen = _tempData.door == 1;
         _tempData.hasMotionStatus = true;
+        _tempData.hasDoorStatus = true;
+        _tempData.hasDoorOpen = true;
 
         _tempData.accelX =
             (int16_t)((payloadVector[13] << 8) | payloadVector[14]);
@@ -538,7 +568,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
         _tempData.rssi = advertisedDevice->getRSSI();
         _tempData.lastUpdate = millis();
 
-        _tempDataList.push_back(_tempData);
+        storeLatest(_tempDataList, _tempData);
         _foundDevice = true;
         return;
       }
@@ -589,7 +619,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
                         _tempData.temperature, _tempData.humidity, (int)batt);
         }
 
-        _tempDataList.push_back(_tempData);
+        storeLatest(_tempDataList, _tempData);
         _foundDevice = true;
       }
     }
@@ -608,6 +638,7 @@ void BLEMokoScanner::begin() {
     return;
   }
   DVL_PRINTLN("Inicializando NimBLE...");
+  NimBLEDevice::setScanFilterMode(2); // misma MAC con distintos slots de datos
   NimBLEDevice::init("LILY-GO-BLE");
   pBLEScan = NimBLEDevice::getScan();
   pBLEScan->setScanCallbacks(new MyAdvertisedDeviceCallbacks());
@@ -630,6 +661,8 @@ void BLEMokoScanner::loop() {
     DVL_PRINTLN("Iniciando escaneo NimBLE...");
     _foundDevice = false; // Reset for this scan
     _tempDataList.clear(); // Limpiar la lista de dispisitivos detectados en iteraciones previas
+    _h4DataList.clear();
+    _namedDevices.clear();
 
     // Explicitly pass 'false' to ensure we pick the synchronous overload
     // returning results start(duration, is_continue)
@@ -655,10 +688,22 @@ void BLEMokoScanner::loop() {
       return;
     }
 
+    for (const auto &h4Data : _h4DataList) {
+      for (const auto &device : _namedDevices) {
+        if (device.first == h4Data.mac) {
+          MokoSensorData data = h4Data;
+          data.name = device.second;
+          storeLatest(_tempDataList, data);
+          _foundDevice = true;
+          break;
+        }
+      }
+    }
+
     if (_foundDevice && _tempDataList.size() > 0) {
       latestData = _tempDataList;
       newDataAvailable = true;
-      DVL_PRINTLN("Datos de sensor actualizados (" + String(latestData.size()) + " dispositivos).");
+      DVL_PRINTLN("Datos de sensor actualizados (" + String(latestData.size()) + " tramas BLE).");
     }
 
     pBLEScan->clearResults();

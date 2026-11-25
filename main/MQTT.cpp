@@ -169,6 +169,11 @@ bool publish_mqtt_json(String topic, String jsonPayload) {
   return sent;
 }
 
+static float tensionBackupParaPublicar(float Vbackup, float Vprincipal) {
+  // GPIO36 mide SOLAR_IN; con alimentacion principal no se puede medir la pila en GPIO35.
+  return Vprincipal > 4.5f ? 4.208701f : Vbackup;
+}
+
 String create_mqtt_json_sensor(String topic, String ident,
                                String valor_variable, String fechayhora,
                                float Vbackup,
@@ -178,7 +183,7 @@ String create_mqtt_json_sensor(String topic, String ident,
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
   doc["date"] = fechayhora;
-  doc["Tension_backup"] = Vbackup;
+  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
@@ -217,7 +222,7 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
-  doc["Tension_backup"] = Vbackup;
+  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
@@ -248,7 +253,7 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
-  doc["Tension_backup"] = Vbackup;
+  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
   doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
@@ -289,7 +294,7 @@ String create_mqtt_json_keepalive(String topic, String ident, String fechayhora,
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
   doc["Tension_principal"] = Vprincipal;
-  doc["Tension_backup"] = Vbackup;
+  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
   doc["Version"] = versionado;
   doc["reboot_count"] = rebootCount;
   doc["conn_type"] = connType;

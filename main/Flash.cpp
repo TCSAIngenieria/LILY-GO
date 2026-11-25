@@ -17,7 +17,7 @@ extern String ident;
 String spublishInterval;
 unsigned long publishInterval = 60;
 String skeepAliveInterval;
-unsigned long keepAliveInterval = 300;
+unsigned long keepAliveInterval = 900;
 
 /*MEMORIA CIRCULAR*/
 static int writeIndex = 0;
@@ -32,7 +32,7 @@ void lectura_flash() {
   ultimaLat = leer_de_flash("lat");
   ultimaLon = leer_de_flash("lon");
   spublishInterval = leer_de_flash("time");
-  skeepAliveInterval = leer_de_flash("ka_time", "300");
+  skeepAliveInterval = leer_de_flash("ka_time", "900");
   apn = leer_de_flash("apn", "igprs.claro.com.ar");
   if (spublishInterval != "N/A" && spublishInterval.length() > 0) {
     unsigned long temp = strtoul(spublishInterval.c_str(), NULL, 10);

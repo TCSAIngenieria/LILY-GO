@@ -23,7 +23,7 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
 - **MQTT:** Protocolo principal para envío de datos y recepción de comandos.
 - **Modo Híbrido:** Prioriza la conexión WiFi cuando está disponible; cambia automáticamente a GPRS en caso contrario.
 - **Sincronización Horaria UTC (`ClockSync`):** Sincronización no bloqueante en GSM mediante `+CNTP` modo 1 (UTC puro vía URC), respaldo de red `*PSUTTZ` y fix GPS, además de NTP estándar cuando opera por WiFi.
-- **Keep Alive Configurable:** Trama de diagnóstico con intervalo persistente en Flash configurable mediante `DVL+SKA=<seg>` y `DVL+QKA` (`300 s` por defecto).
+- **Keep Alive Configurable:** Trama de diagnóstico con intervalo persistente en Flash configurable mediante `DVL+SKA=<seg>` y `DVL+QKA` (`900 s` por defecto).
 - **Diagnóstico WiFi por Serial:** Al conectarse o reconectarse, informa ID LILY, SSID/BSSID, MAC, hostname, IP, máscara, gateway, DNS, canal, RSSI y destino MQTT sin exponer la contraseña.
 - **Buffering (Flash):** Almacenamiento temporal de paquetes en memoria SPIFFS/LittleFS ante cortes de conexión para evitar pérdida de datos.
 
@@ -40,6 +40,7 @@ El firmware está orientado a la monitorización remota de activos, permitiendo:
   - Ante una consulta fallida conserva la última lectura válida. Lecturas y fechas están en RAM; se limpian al reiniciar, reconfigurar o borrar la consulta y al cambiar baud/paridad, sin borrar los mensajes históricos en flash.
   - Paridad persistente NONE/EVEN/ODD mediante `DVL+SPARITY_MODBUS` y `DVL+QPARITY_MODBUS`; baud compartido mediante `DVL+SBAUD` y `DVL+QBAUD`. Cambiar uno conserva el otro. Serial común usa 8N1; Modbus usa el formato guardado (8N1/8E1/8O1).
 - **Sensores Dedicados:** Soporte nativo para sensor de temperatura DS18B20.
+- **Sensores BLE MOKO:** H4 Pro valida el nombre `DVL` o `PaPeR` por MAC durante el escaneo y publica solo la ultima trama `0x70` de temperatura/humedad; los otros slots no generan un JSON que la desplace. MOKO Door se decodifica de forma independiente. L02S/EA01 publica el estado de puerta en `door` y `door_open` cuando es detectado. La telemetría de alimentación publica la lectura `SOLAR_IN` como tensión principal y usa `4.208701 V` simulado para backup cuando la principal supera `4.5 V`.
 - **Expansora I/O:** Comunicación con placas expansoras vía puerto serial secundario.
 - **Motor de Eventos Programable (Micro-PLC):** Evaluación periódica cada 100 ms de 4 reglas (`EV0`..`EV3`) con temporizador TON y rearme (`ONESHOT`/`REPEAT`). Monitorea tensiones/ADC (`VPRIN`, `VBACK`, `ADC0`, `ADC1`), entradas digitales/enlace (`DI1`, `DI2`, `COMM`), sensores cableados (`TEMP`, `S0`..`S15`), balizas BLE Moko filtrables por MAC (`BLE_DOOR`, `BLE_MOV`, `BLE_TEMP`, `BLE_HUM`, `BLE_BAT`), salud del ESP32 (`TEMP_MCU`, `HEAP`, `BTN`) y 4 disparadores fecha/hora (`DT0`..`DT3`). Ejecuta acciones locales (`OUT`, `CYCLE_PWR`, `RESTART`) y emite alertas inmediatas por MQTT.
 

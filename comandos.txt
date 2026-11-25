@@ -27,7 +27,7 @@ Este documento detalla todos los comandos disponibles en el sistema, su sintaxis
 | `DVL+SFFIN=<marker>` | Establece el marcador de fin de la trama de datos. | `DVL+SFFIN=\r` |
 | `DVL+SPARSE=<char>` | Establece el carácter separador de campos en la trama. | `DVL+SPARSE=;` |
 | `DVL+STIME=<seg>` | Establece el intervalo de publicación de datos (en segundos). | `DVL+STIME=60` |
-| `DVL+SKA=<seg>` | Establece el intervalo de publicación de la trama Keep Alive en segundos (por defecto `300`). | `DVL+SKA=300` |
+| `DVL+SKA=<seg>` | Establece el intervalo de publicación de la trama Keep Alive en segundos (por defecto `900`). | `DVL+SKA=900` |
 
 ### Habilitaciones (Flags)
 
@@ -161,9 +161,9 @@ Estos comandos devuelven el estado actual de las configuraciones.
 
 | Comando | Retorna (Ejemplo) | Descripción |
 | :--- | :--- | :--- |
-| `DVL+VER` | `VERSION=V07.19.06` | Versión del firmware. |
+| `DVL+VER` | `VERSION=V07.19.10` | Versión del firmware. |
 | `DVL+QTIME` | `TIME=60` | Intervalo de publicación. |
-| `DVL+QKA` | `KEEP_ALIVE=300` | Intervalo de publicación de la trama Keep Alive (segundos). |
+| `DVL+QKA` | `KEEP_ALIVE=900` | Intervalo de publicación de la trama Keep Alive (segundos). |
 | `DVL+QEVT=<id>` | `EV0=1,VPRIN,<,11.50,30,MQTT,ONESHOT` | Configuración de la regla de evento `<id>` (`0..3`). |
 | `DVL+EVT_STATUS` | *(Tabla por Serial/RESPUESTA)* | Estado en vivo de `EV0..EV3`, `DT0..DT3` y reloj `RTC`. |
 | `DVL+QDT=<id>` | `DT0=2026-11-20 08:30:00 (ESTADO=0)` | Programación y estado del disparador fecha/hora `<id>` (`0..3`). |
