@@ -176,15 +176,12 @@ static float tensionBackupParaPublicar(float Vbackup, float Vprincipal) {
 
 String create_mqtt_json_sensor(String topic, String ident,
                                String valor_variable, String fechayhora,
-                               float Vbackup,
-                               float Vprincipal, unsigned long numeroPaquete) {
+                               unsigned long numeroPaquete) {
   StaticJsonDocument<256> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
   doc["temperatura"] = valor_variable;
   doc["date"] = fechayhora;
-  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
-  doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
 
@@ -198,8 +195,8 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
                                String S6, String S7, String S8, String S9,
                                String S10, String S11, String S12, String S13,
                                String S14, String S15, String fechayhora,
-                               String latitud, String longitud, float Vbackup,
-                               float Vprincipal, unsigned long numeroPaquete) {
+                               String latitud, String longitud,
+                               unsigned long numeroPaquete) {
   StaticJsonDocument<512> doc;
   doc["topic"] = topic;
   doc["ident"] = ident;
@@ -222,8 +219,6 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
-  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
-  doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
 
@@ -233,8 +228,8 @@ String create_mqtt_json_serial(String topic, String ident, String S0, String S1,
 }
 
 String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
-                               String latitud, String longitud, float Vbackup,
-                               float Vprincipal, unsigned long numeroPaquete,
+                               String latitud, String longitud,
+                               unsigned long numeroPaquete,
                                uint8_t frameIdx) {
   ModbusFrameCfg frame;
   if (!modbus_get_frame(frameIdx, frame) || !frame.used) return "";
@@ -253,8 +248,6 @@ String create_mqtt_json_modbus(String topic, String ident, String fechayhora,
   doc["date"] = fechayhora;
   doc["latitud"] = latitud;
   doc["longitud"] = longitud;
-  doc["Tension_backup"] = tensionBackupParaPublicar(Vbackup, Vprincipal);
-  doc["Tension_principal"] = Vprincipal;
   doc["Version"] = versionado;
   doc["index"] = numeroPaquete;
 

@@ -133,9 +133,7 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Tension_backup": 4.208701,
-  "Tension_principal": 5.08,
-  "Version": "V07.19.10",
+  "Version": "V07.19.11",
   "index": 482
 }
 ```
@@ -154,9 +152,7 @@ Todos los reportes periódicos enviados al Broker MQTT (tópico base: `DVL/LILY-
   "date": "2026-06-04 16:04:00",
   "latitud": "-34.6037",
   "longitud": "-58.3816",
-  "Tension_backup": 4.208701,
-  "Tension_principal": 5.08,
-  "Version": "V07.19.10",
+  "Version": "V07.19.11",
   "index": 483
 }
 ```
@@ -195,7 +191,7 @@ Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<s
   "longitud": "-58.3816",
   "Tension_principal": 5.08,
   "Tension_backup": 4.208701,
-  "Version": "V07.19.10",
+  "Version": "V07.19.11",
   "reboot_count": 12,
   "conn_type": "GPRS",
   "conn_detail": "SIM7000 LTE-M",
@@ -208,11 +204,11 @@ Emitido periódicamente según el intervalo configurado en Flash con `DVL+SKA=<s
 }
 ```
 
-En los JSON de sensor, serial, Modbus y keep alive, `Tension_principal` es la
+Solo en el JSON keep alive, `Tension_principal` es la
 lectura de `GPIO36/SOLAR_IN`. Si supera `4.5 V`, `Tension_backup` se publica
 como `4.208701 V` simulado porque no puede medirse la pila por `GPIO35/VVBAT`
 en esa condición; de lo contrario se publica la lectura real de `GPIO35`.
-Los JSON BLE y ADC no incluyen estas tensiones. Los paquetes ya guardados
+Los JSON DS18B20, SERIAL, MODBUS, BLE y ADC no incluyen estas tensiones. Los paquetes ya guardados
 conservan el valor que tenían al generarse.
 
 ### 5.4 Payload de Eventos (Micro-PLC)

@@ -22,7 +22,7 @@ Todos los comandos descriptos en este documento pueden ejecutarse de manera indi
 | Comando | Parámetros y Descripción Técnica | Ejemplo de Envío | Respuesta Esperada |
 |:---|:---|:---|:---|
 | `DVL+ID=<id>` | Define el identificador único del equipo en Flash NVM, actualiza el tópico raíz a `DVL/LILY-GO/<id>` y fuerza la reconexión al Broker MQTT. | `DVL+ID=60001` | `Rident_OK (TOPIC: DVL/LILY-GO/60001)` |
-| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.10` |
+| `DVL+VER` | Devuelve la versión de firmware compilada actualmente en ejecución. | `DVL+VER` | `VERSION=V07.19.11` |
 | `DVL+RESET` | Ejecuta un reinicio inmediato por software del microcontrolador ESP32 (`ESP.restart()`). | `DVL+RESET` | `>> Reiniciando dispositivo...` |
 | `DVL+STIME=<seg>` | Configura y persiste en Flash el intervalo periódico de publicación de telemetría de sensores (en segundos). | `DVL+STIME=60` | `TIEMPO SETEADO OK` |
 | `DVL+QTIME` | Consulta el intervalo de publicación de telemetría configurado actualmente. | `DVL+QTIME` | `TIME=60` |
@@ -187,8 +187,8 @@ El timeout RX sigue en 200 ms y el polling en una consulta cada 2 s como mínimo
 ## 8. Conversor Analógico-Digital (ADC) y Monitoreo de Alimentación
 
 ### Asignación de Pines Analógicos (ESP32 ADC1 — 12 bits, Atenuación 11 dB)
-* **`GPIO36` (`S_VP / SOLAR_IN`) — Alimentación Principal (`Tension_principal`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). Se publica la lectura en los JSON de `keep-alive`, `DS18B20`, `SERIAL` y `MODBUS`. Este pin mide `SOLAR_IN`, no `VIN_5V`.
-* **`GPIO35` (`IO35 / VVBAT`) — Alimentación de Backup / Batería (`Tension_backup`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). En esos mismos JSON se publica `4.208701 V` simulado cuando `Tension_principal > 4.5 V`; en caso contrario se publica la lectura real de `GPIO35`. Los JSON `BLE` y `/ADC` no incluyen estas tensiones. El valor usado por la regla `VBACK` del motor de eventos sigue siendo la lectura de `GPIO35`.
+* **`GPIO36` (`S_VP / SOLAR_IN`) — Alimentación Principal (`Tension_principal`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). Se publica solo en el JSON de `keep-alive`. Este pin mide `SOLAR_IN`, no `VIN_5V`.
+* **`GPIO35` (`IO35 / VVBAT`) — Alimentación de Backup / Batería (`Tension_backup`):** Muestreo automático con promedio de 8 lecturas (`analogReadMilliVolts`) y compensación de divisor resistivo (`x2.0`). En `keep-alive` se publica `4.208701 V` simulado cuando `Tension_principal > 4.5 V`; en caso contrario se publica la lectura real de `GPIO35`. Los JSON `DS18B20`, `SERIAL`, `MODBUS`, `BLE` y `/ADC` no incluyen estas tensiones. El valor usado por la regla `VBACK` del motor de eventos sigue siendo la lectura de `GPIO35`.
 * **`GPIO34` — Entrada Analógica Externa `ADC0` (Índice `<n> = 0`):** Canal analógico configurable con filtro de umbral mínimo, promedio móvil (`cantMed`) y calibración lineal (`factor` / `offset`). Publicado bajo la clave `"adc0"` en el subtópico `/ADC`.
 * **`GPIO39` (`S_VN`) — Entrada Analógica Externa `ADC1` (Índice `<n> = 1`):** Canal analógico configurable con filtro de umbral mínimo, promedio móvil (`cantMed`) y calibración lineal (`factor` / `offset`). Publicado bajo la clave `"adc1"` en el subtópico `/ADC`.
 

@@ -53,7 +53,7 @@ HardwareSerial SensorSerial(2); // UART2
 #define LED_PIN 2
 #define WDT_TIMEOUT 120 // segundos para que reinicie por watchdog
 
-String versionado = "V07.19.10";
+String versionado = "V07.19.11";
 
 /*VARIABLES MQTT*/
 unsigned long ledTimer = 0;
@@ -761,8 +761,7 @@ void loop() {
   topicSensor.toUpperCase();
 
         String jsonsensor = create_mqtt_json_sensor(
-            topicSensor, ident, valorStr, printCurrentTime(),
-            leer_tension_backup(), leer_tension_principal(), numPkt);
+            topicSensor, ident, valorStr, printCurrentTime(), numPkt);
 
         if (mqtt.connected()) {
 
@@ -800,7 +799,7 @@ void loop() {
           sensorValues[7], sensorValues[8], sensorValues[9], sensorValues[10],
           sensorValues[11], sensorValues[12], sensorValues[13],
           sensorValues[14], sensorValues[15], printCurrentTime(), ultimaLat,
-          ultimaLon, leer_tension_backup(), leer_tension_principal(), numPkt);
+          ultimaLon, numPkt);
 
       if (mqtt.connected()) {
 
@@ -837,7 +836,7 @@ void loop() {
         unsigned long numPkt = obtener_y_avanzar_numero_paquete();
         String jsonmodbus = create_mqtt_json_modbus(
             topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
-            leer_tension_backup(), leer_tension_principal(), numPkt, frameIdx);
+            numPkt, frameIdx);
 
         if (envioModbusEnCola() && !flash_buffer_empty()) {
           if (topicModbus.length() == 0 || jsonmodbus.length() == 0 ||
@@ -955,7 +954,7 @@ void loop() {
       unsigned long numPkt = obtener_y_avanzar_numero_paquete();
       String jsonmodbus = create_mqtt_json_modbus(
           topicModbus, ident, printCurrentTime(), ultimaLat, ultimaLon,
-          leer_tension_backup(), leer_tension_principal(), numPkt, changedIdx);
+          numPkt, changedIdx);
 
       DVL_PRINTF("[MODBUS] Cambio de datos en idx=%u. Procesando envio...\n",
                  (unsigned int)changedIdx);
